@@ -6,7 +6,7 @@ import { db } from './db';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 
-export type Role = 'Fleet Manager' | 'Dispatcher' | 'Safety Officer' | 'Financial Analyst' | 'Driver' | 'Maintenance Technician';
+export type Role = 'Fleet Manager' | 'Safety Officer' | 'Financial Analyst' | 'Driver';
 
 export type Theme = 'light' | 'dark';
 export type Currency = 'USD' | 'INR';
@@ -84,19 +84,6 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
         },
       ];
 
-    case 'Dispatcher':
-      return [
-        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-        {
-          name: 'Operations',
-          icon: 'Briefcase',
-          subItems: [
-            { name: 'Dispatch Board', path: '/trips', icon: 'Navigation' },
-            { name: 'Driver Availability', path: '/drivers', icon: 'Users' },
-            { name: 'Vehicle Availability', path: '/vehicles', icon: 'Truck' },
-          ],
-        },
-      ];
 
     case 'Safety Officer':
       return [
@@ -140,20 +127,6 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
         },
       ];
 
-    case 'Maintenance Technician':
-      return [
-        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-        {
-          name: 'Workshop',
-          icon: 'Wrench',
-          subItems: [
-            { name: 'Work Orders', path: '/maintenance', icon: 'Wrench' },
-            { name: 'Fleet Units', path: '/vehicles', icon: 'Truck' },
-            { name: 'Predictions', path: '/ai-predictions', icon: 'Sparkles' },
-          ],
-        },
-      ];
-
     case 'Driver':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
@@ -185,14 +158,14 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
 // ============================================
 
 export const routePermissions: Record<string, Role[]> = {
-  '/': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst', 'Driver', 'Maintenance Technician'],
-  '/vehicles': ['Fleet Manager', 'Safety Officer', 'Dispatcher', 'Driver', 'Maintenance Technician'],
-  '/drivers': ['Fleet Manager', 'Safety Officer', 'Dispatcher'],
-  '/trips': ['Fleet Manager', 'Dispatcher', 'Driver'],
-  '/maintenance': ['Fleet Manager', 'Maintenance Technician', 'Safety Officer', 'Driver'],
+  '/': ['Fleet Manager', 'Safety Officer', 'Financial Analyst', 'Driver'],
+  '/vehicles': ['Fleet Manager', 'Safety Officer', 'Driver'],
+  '/drivers': ['Fleet Manager', 'Safety Officer'],
+  '/trips': ['Fleet Manager', 'Driver'],
+  '/maintenance': ['Fleet Manager', 'Safety Officer', 'Driver'],
   '/fuel-expenses': ['Fleet Manager', 'Financial Analyst', 'Driver'],
   '/reports': ['Fleet Manager', 'Financial Analyst'],
-  '/ai-predictions': ['Fleet Manager', 'Maintenance Technician'],
+  '/ai-predictions': ['Fleet Manager'],
   '/economic-simulator': ['Fleet Manager', 'Financial Analyst'],
   '/fleet-command': ['Fleet Manager'],
   '/financial-war-room': ['Fleet Manager', 'Financial Analyst'],
@@ -315,10 +288,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     if (r === 'Fleet Manager') return true;
 
     switch (r) {
-      case 'Dispatcher':
-        if (resource === 'trips') return ['create', 'read', 'update', 'dispatch', 'delete'].includes(action);
-        if (resource === 'vehicles' || resource === 'drivers') return action === 'read';
-        return false;
       case 'Driver':
         if (resource === 'trips') return ['create', 'read', 'update', 'dispatch'].includes(action);
         if (resource === 'vehicles' || resource === 'drivers') return action === 'read';
@@ -337,20 +306,15 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         if (resource === 'reports') return ['read', 'export'].includes(action);
         if (resource === 'vehicles' || resource === 'trips' || resource === 'maintenance') return action === 'read';
         return false;
-      case 'Maintenance Technician':
-        if (resource === 'maintenance') return ['create', 'read', 'update', 'delete'].includes(action);
-        if (resource === 'vehicles') return ['read', 'update'].includes(action);
-        if (resource === 'predictions' || resource === 'ai') return action === 'read';
-        return false;
       default:
         return false;
     }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (user && profile) {
+    if (user) {
       const data = await db.updateProfile(user.id, {
-        role: profile.role,
+        role: profile?.role || 'Fleet Manager',
         ...updates,
       });
       setProfile(data);

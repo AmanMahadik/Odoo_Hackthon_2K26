@@ -1008,7 +1008,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {(role === 'Driver' || role === 'Dispatcher') && (
+            {(role === 'Driver') && (
               <Link
                 href="/trips?new=true"
                 className={`${buttonVariants({ size: 'sm' })} w-full mt-1`}
@@ -1031,7 +1031,7 @@ export default function Dashboard() {
 
       {/* Analytics row — compact bottom, high-contrast bars */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 pb-0">
-        {(role === 'Fleet Manager' || role === 'Maintenance Technician') && (
+        {(role === 'Fleet Manager') && (
           <AIPredictionCard prediction={mockPrediction} vehicleReg="FLEET-T800" />
         )}
 

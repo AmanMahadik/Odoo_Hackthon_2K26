@@ -6,22 +6,12 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
 ]);
 
-/**
- * Always send unauthenticated users to our branded /sign-in page —
- * never Clerk Account Portal hosted UI (purple default theme).
- */
 export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) return;
-
-  const { userId } = await auth();
-  if (!userId) {
-    const signIn = new URL('/sign-in', req.url);
-    // Preserve where they were going
-    const returnTo = req.nextUrl.pathname + req.nextUrl.search;
-    if (returnTo && returnTo !== '/') {
-      signIn.searchParams.set('redirect_url', returnTo);
+  if (!isPublicRoute(req)) {
+    const authObj = await auth();
+    if (!authObj.userId) {
+      return authObj.redirectToSignIn();
     }
-    return NextResponse.redirect(signIn);
   }
 });
 

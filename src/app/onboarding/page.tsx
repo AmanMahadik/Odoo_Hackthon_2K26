@@ -24,7 +24,6 @@ import {
   Check,
 } from 'lucide-react';
 
-/** Self-serve roles only — Fleet Manager is assigned by admin, not selectable here */
 const roles: {
   id: Role;
   title: string;
@@ -32,16 +31,16 @@ const roles: {
   icon: React.ElementType;
 }[] = [
   {
+    id: 'Fleet Manager',
+    title: 'Fleet Manager',
+    description: 'Oversees fleet assets, maintenance, vehicle lifecycle, and operational efficiency.',
+    icon: Truck,
+  },
+  {
     id: 'Driver',
     title: 'Driver',
     description: 'View trips, log fuel, and report vehicle issues from the road.',
     icon: Truck,
-  },
-  {
-    id: 'Dispatcher',
-    title: 'Dispatcher',
-    description: 'Assign trips, check driver and vehicle availability.',
-    icon: Navigation,
   },
   {
     id: 'Safety Officer',
@@ -54,12 +53,6 @@ const roles: {
     title: 'Financial Analyst',
     description: 'Expenses, fuel, ROI reports, and cost scenarios.',
     icon: TrendingUp,
-  },
-  {
-    id: 'Maintenance Technician',
-    title: 'Maintenance Technician',
-    description: 'Work orders, fleet units, and predictive service alerts.',
-    icon: Wrench,
   },
 ];
 
@@ -83,10 +76,6 @@ export default function OnboardingPage() {
     e.preventDefault();
     if (!selectedRole) {
       setError('Please select a role to continue.');
-      return;
-    }
-    if (selectedRole === 'Fleet Manager') {
-      setError('Fleet Manager access is assigned by your organization admin.');
       return;
     }
 
@@ -144,8 +133,7 @@ export default function OnboardingPage() {
               Complete your profile
             </CardTitle>
             <CardDescription className="font-normal">
-              Choose your workspace role. Fleet Manager access is provisioned by an admin — it
-              cannot be self-selected.
+              Choose your workspace role to customize your dashboard.
             </CardDescription>
           </CardHeader>
 
