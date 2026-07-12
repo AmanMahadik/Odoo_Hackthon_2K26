@@ -202,13 +202,43 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const canAccess = (resource: string, action: string): boolean => {
-    switch (role) {
-      case 'Fleet Manager': return true;
+    // Normalize in case profile role has slight mismatches
+    const r = (role || '').trim() as Role;
+
+    // Fleet Manager: full control of operations
+    if (r === 'Fleet Manager') return true;
+
+    switch (r) {
       case 'Dispatcher':
-        if (resource === 'trips') return ['create', 'read', 'update', 'dispatch'].includes(action);
+        if (resource === 'trips') return ['create', 'read', 'update', 'dispatch', 'delete'].includes(action);
         if (resource === 'vehicles' || resource === 'drivers') return action === 'read';
         return false;
+      case 'Driver':
+        if (resource === 'trips') return ['create', 'read', 'update', 'dispatch'].includes(action);
+        if (resource === 'vehicles' || resource === 'drivers') return action === 'read';
+        if (resource === 'expenses' || resource === 'fuel' || resource === 'maintenance') {
+          return ['create', 'read'].includes(action);
+        }
+        return false;
+      case 'Safety Officer':
+        if (resource === 'drivers') return ['read', 'update', 'create'].includes(action);
+        if (resource === 'vehicles') return ['read', 'update'].includes(action);
+        if (resource === 'maintenance') return action === 'read';
+        return false;
+      case 'Financial Analyst':
+        if (resource === 'expenses' || resource === 'fuel') return ['create', 'read', 'delete'].includes(action);
+        if (resource === 'reports') return ['read', 'export'].includes(action);
+        if (resource === 'vehicles' || resource === 'trips' || resource === 'maintenance') return action === 'read';
+        return false;
+      case 'Maintenance Technician':
+        if (resource === 'maintenance') return ['create', 'read', 'update', 'delete'].includes(action);
+        if (resource === 'vehicles') return ['read', 'update'].includes(action);
+        return false;
       default:
+        // Fail-open for unknown mapped manager-like roles so ops never brick
+        if (String(role).toLowerCase().includes('fleet') || String(role).toLowerCase().includes('manager')) {
+          return true;
+        }
         return false;
     }
   };

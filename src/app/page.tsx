@@ -13,7 +13,8 @@ import {
   MaintenancePrediction,
   mockDrivers,
 } from '@/lib/mockData';
-import { gpsService } from '@/lib/mockServices';
+import { gpsService, economicService } from '@/lib/mockServices';
+import type { FuelPriceData } from '@/lib/mockData';
 import {
   TrendingUp,
   Truck,
@@ -33,6 +34,8 @@ import {
   Newspaper,
   BarChart3,
   X,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
 import AIPredictionCard from '@/components/ai/AIPredictionCard';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -116,7 +119,7 @@ function useSmoothList(ids: string[]) {
         if (Math.abs(dy) > 1) {
           el.animate(
             [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
-            { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+            { duration: 520, easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)' }
           );
         }
       }
@@ -166,6 +169,11 @@ export default function Dashboard() {
     { id: string; reg: string; description: string; kind: 'maint' | 'fuel'; href: string }[]
   >([]);
   const [insightCards, setInsightCards] = useState<FeedItem[]>([]);
+  const [fuelIndex, setFuelIndex] = useState<FuelPriceData | null>(null);
+
+  useEffect(() => {
+    economicService.getFuelPrice().then(setFuelIndex).catch(console.error);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -658,29 +666,96 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-4 gap-3">
-        {segmentCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Link key={card.title} href={card.href} className="group">
-              <Card className="h-full transition-all hover:shadow-md hover:ring-primary/20 group-hover:-translate-y-0.5">
-                <CardHeader className="pb-1 flex flex-row items-start justify-between space-y-0">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">
-                    {card.title}
-                  </CardTitle>
-                  <div className={`p-1.5 rounded-md ${card.accent}`}>
-                    <Icon className="h-3.5 w-3.5" />
+      {/* Live KPI marquee + global fuel index */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+        <div className="lg:col-span-9 relative overflow-hidden rounded-xl border border-border bg-card">
+          <div className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-card to-transparent pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-l from-card to-transparent pointer-events-none" />
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Live ops strip
+            </span>
+          </div>
+          <div className="overflow-hidden py-2.5">
+            <div className="transitops-marquee-track gap-3 px-3">
+              {[...segmentCards, ...segmentCards].map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <Link
+                    key={`${card.title}-${i}`}
+                    href={card.href}
+                    className="shrink-0 w-[160px] rounded-lg border border-border bg-background/80 px-3 py-2.5 hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-medium text-muted-foreground truncate">
+                        {card.title}
+                      </span>
+                      <div className={`p-1 rounded-md ${card.accent}`}>
+                        <Icon className="h-3 w-3" />
+                      </div>
+                    </div>
+                    <div className="text-xl font-bold tracking-tight">{card.value}</div>
+                    <p className="text-[9px] text-muted-foreground truncate">{card.subtitle}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Fuel className="h-4 w-4 text-amber-500" /> Global fuel index
+            </CardTitle>
+            <CardDescription className="text-[11px]">Market diesel / petrol pulse</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {fuelIndex ? (
+              <>
+                <div className="flex items-end justify-between gap-2">
+                  <div>
+                    <div className="text-2xl font-bold tracking-tight">
+                      ${fuelIndex.price.toFixed(2)}
+                      <span className="text-xs font-medium text-muted-foreground ml-1">
+                        /L {fuelIndex.currency}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Spot index · live feed</p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold tracking-tight">{card.value}</div>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{card.subtitle}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+                  <Badge
+                    variant="outline"
+                    className={
+                      fuelIndex.trend === 'rising'
+                        ? 'text-red-500 border-red-500/30'
+                        : fuelIndex.trend === 'falling'
+                          ? 'text-emerald-500 border-emerald-500/30'
+                          : ''
+                    }
+                  >
+                    {fuelIndex.trend === 'rising' && <TrendingUp className="h-3 w-3 mr-1" />}
+                    {fuelIndex.trend === 'falling' && <TrendingDown className="h-3 w-3 mr-1" />}
+                    {fuelIndex.trend === 'stable' && <Minus className="h-3 w-3 mr-1" />}
+                    {fuelIndex.changePercent > 0 ? '+' : ''}
+                    {fuelIndex.changePercent}%
+                  </Badge>
+                </div>
+                <Link
+                  href="/fuel-expenses"
+                  className={`${buttonVariants({ variant: 'outline', size: 'sm' })} w-full`}
+                >
+                  Open fuel desk
+                </Link>
+              </>
+            ) : (
+              <div className="h-16 animate-pulse rounded-md bg-muted" />
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* MAP TOP + live vehicle sidebar */}
