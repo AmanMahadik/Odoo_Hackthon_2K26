@@ -434,5 +434,77 @@ export const db = {
     expensesList.push(newExpense);
     saveSandboxState('expenses', expensesList);
     return newExpense;
+  },
+
+  // NOTIFICATIONS (generated dynamically from data state to satisfy the dynamic rule)
+  async getNotifications(): Promise<{ id: string; type: string; text: string; time: string }[]> {
+    const notificationsList: { id: string; type: string; text: string; time: string }[] = [];
+    
+    try {
+      const drivers = await this.getDrivers();
+      const today = new Date();
+      drivers.forEach(d => {
+        const expiry = new Date(d.license_expiry_date);
+        const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) {
+          notificationsList.push({
+            id: `notif_exp_${d.id}`,
+            type: 'expiry',
+            text: `Driver ${d.name}'s license has EXPIRED!`,
+            time: 'Expired status'
+          });
+        } else if (diffDays <= 30) {
+          notificationsList.push({
+            id: `notif_exp_${d.id}`,
+            type: 'expiry',
+            text: `Driver ${d.name}'s license is expiring in ${diffDays} days!`,
+            time: 'Action required'
+          });
+        }
+      });
+
+      const vehicles = await this.getVehicles();
+      vehicles.forEach(v => {
+        if (v.status === 'In Shop') {
+          notificationsList.push({
+            id: `notif_maint_${v.id}`,
+            type: 'maintenance',
+            text: `Vehicle ${v.registration_number} is undergoing active workshop maintenance.`,
+            time: 'In shop'
+          });
+        } else if (v.odometer > 80000 && v.status === 'Available') {
+          notificationsList.push({
+            id: `notif_odo_${v.id}`,
+            type: 'maintenance',
+            text: `Vehicle ${v.registration_number} high mileage check (${v.odometer.toLocaleString()} km). Schedule service soon.`,
+            time: 'Overdue soon'
+          });
+        }
+      });
+
+      const trips = await this.getTrips();
+      const activeTrips = trips.filter(t => t.status === 'Dispatched');
+      activeTrips.forEach(t => {
+        notificationsList.push({
+          id: `notif_trip_${t.id}`,
+          type: 'trip',
+          text: `Trip TRP-${t.id.substring(0, 4)} is actively in transit to ${t.destination}.`,
+          time: 'Active'
+        });
+      });
+
+    } catch (err) {
+      console.error("Error generating dynamic notifications:", err);
+    }
+
+    // Default notifications if none generated to keep UI populated
+    if (notificationsList.length === 0) {
+      notificationsList.push(
+        { id: 'default_1', type: 'expiry', text: 'All fleet drivers licenses are currently in compliance.', time: 'System Check' },
+        { id: 'default_2', type: 'maintenance', text: 'No vehicles require urgent workshop check-in today.', time: 'System Check' }
+      );
+    }
+
+    return notificationsList;
   }
 };

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, Role } from '@/lib/roleContext';
+import { db } from '@/lib/db';
 import { 
   LayoutDashboard, 
   Truck, 
@@ -29,12 +30,23 @@ export default function Shell({ children }: ShellProps) {
   const { role, setRole, profile, signOut, isSandboxMode } = useRole();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Hardcoded notifications for demo context
-  const notifications = [
-    { id: 1, type: 'expiry', text: 'Driver Mike Ross license is expiring in 15 days!', time: '2 hours ago' },
-    { id: 2, type: 'maintenance', text: 'Vehicle BIK-01 is overdue for Engine Inspection.', time: '5 hours ago' },
-    { id: 3, type: 'trip', text: 'Trip TRP-2024-0001 was completed by Alex Johnson.', time: '1 day ago' },
-  ];
+  const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string }[]>([]);
+
+  useEffect(() => {
+    async function loadNotifications() {
+      try {
+        const data = await db.getNotifications();
+        setNotifications(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    if (pathname !== '/login') {
+      loadNotifications();
+      const interval = setInterval(loadNotifications, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [pathname]);
 
   const menuItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
