@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect, useCallback } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { db } from '@/lib/db';
@@ -20,7 +20,6 @@ import {
   Users,
   Wrench,
   ArrowRight,
-  ShieldCheck,
   Navigation,
   Fuel,
   Activity,
@@ -33,7 +32,6 @@ import {
   Filter,
   Newspaper,
   BarChart3,
-  Sparkles,
   X,
 } from 'lucide-react';
 import AIPredictionCard from '@/components/ai/AIPredictionCard';
@@ -95,6 +93,49 @@ type FeedItem = {
   ts: number;
 };
 
+/** Smooth FLIP reorder — cards stay normal; only position eases when order changes. */
+function useSmoothList(ids: string[]) {
+  const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const prevRects = useRef<Map<string, DOMRect>>(new Map());
+
+  const setItemRef = useCallback((id: string, el: HTMLElement | null) => {
+    if (el) itemRefs.current.set(id, el);
+    else itemRefs.current.delete(id);
+  }, []);
+
+  useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+    ids.forEach((id) => {
+      const el = itemRefs.current.get(id);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      nextRects.set(id, rect);
+      const prev = prevRects.current.get(id);
+      if (prev) {
+        const dy = prev.top - rect.top;
+        if (Math.abs(dy) > 1) {
+          el.animate(
+            [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+            { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+          );
+        }
+      }
+    });
+    prevRects.current = nextRects;
+  }, [ids]);
+
+  return setItemRef;
+}
+
+function bumpToTop<T extends { id: string }>(list: T[], id: string): T[] {
+  const idx = list.findIndex((x) => x.id === id);
+  if (idx <= 0) return list;
+  const next = [...list];
+  const [item] = next.splice(idx, 1);
+  next.unshift(item);
+  return next;
+}
+
 export default function Dashboard() {
   const { role, canAccess } = useRole();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -105,8 +146,8 @@ export default function Dashboard() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [livePositions, setLivePositions] = useState<Record<string, any>>({});
   const [vehicleOrder, setVehicleOrder] = useState<string[]>([]);
-  const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const prevPosRef = useRef<Record<string, { lat: number; lng: number; speed: number }>>({});
+  const firstGpsTick = useRef(true);
 
   const [typeFilter, setTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -118,6 +159,13 @@ export default function Dashboard() {
   const [draftRegion, setDraftRegion] = useState('All');
 
   const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
+  const [tripCards, setTripCards] = useState<
+    { id: string; trip_number: number; source: string; destination: string; kind: 'live' | 'draft' }[]
+  >([]);
+  const [maintCards, setMaintCards] = useState<
+    { id: string; reg: string; description: string; kind: 'maint' | 'fuel'; href: string }[]
+  >([]);
+  const [insightCards, setInsightCards] = useState<FeedItem[]>([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -195,6 +243,48 @@ export default function Dashboard() {
         ].sort((a, b) => b.ts - a.ts);
 
         setActivityFeed(feed);
+
+        setTripCards([
+          ...t
+            .filter((x) => x.status === 'Dispatched')
+            .map((x) => ({
+              id: x.id,
+              trip_number: x.trip_number,
+              source: x.source,
+              destination: x.destination,
+              kind: 'live' as const,
+            })),
+          ...t
+            .filter((x) => x.status === 'Draft')
+            .map((x) => ({
+              id: x.id,
+              trip_number: x.trip_number,
+              source: x.source,
+              destination: x.destination,
+              kind: 'draft' as const,
+            })),
+        ]);
+
+        setMaintCards([
+          ...m
+            .filter((x) => x.status === 'Open')
+            .map((x) => ({
+              id: x.id,
+              reg: x.vehicle?.registration_number || 'Unit',
+              description: x.description,
+              kind: 'maint' as const,
+              href: '/maintenance',
+            })),
+          {
+            id: 'fuel-desk',
+            reg: 'Fuel desk',
+            description: 'Review recent fill-ups & expense ledger',
+            kind: 'fuel' as const,
+            href: '/fuel-expenses',
+          },
+        ]);
+
+        setInsightCards(feed.filter((a) => a.type === 'news' || a.type === 'alert'));
       } catch (err) {
         console.error(err);
       } finally {
@@ -204,7 +294,7 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  // Live positions + bubble updated vehicles to top
+  // Live positions — on real update, that vehicle slides smoothly to top (no flash)
   useEffect(() => {
     const tick = () => {
       const state = gpsService.getLiveFleetState();
@@ -216,14 +306,11 @@ export default function Dashboard() {
 
       for (const [id, pos] of Object.entries(positions)) {
         const p = prev[id];
-        if (!p) {
-          updated.push(id);
-          continue;
-        }
+        if (!p) continue; // first sample for this unit — don't reorder yet
         const moved =
-          Math.abs(p.lat - pos.lat) > 0.00015 ||
-          Math.abs(p.lng - pos.lng) > 0.00015 ||
-          Math.abs(p.speed - pos.speed) > 3;
+          Math.abs(p.lat - pos.lat) > 0.0002 ||
+          Math.abs(p.lng - pos.lng) > 0.0002 ||
+          Math.abs(p.speed - pos.speed) > 4;
         if (moved) updated.push(id);
       }
 
@@ -240,65 +327,63 @@ export default function Dashboard() {
         for (const id of ids) {
           if (!next.includes(id)) next.push(id);
         }
-        // Bubble latest updates to front
+        // First tick: keep stable order (moving units first is fine once)
+        if (firstGpsTick.current) {
+          firstGpsTick.current = false;
+          return next;
+        }
+        // Only promote one unit at a time so the slide is clear
         if (updated.length) {
-          const bump = updated.filter((id) => next.includes(id));
-          next = [...bump, ...next.filter((id) => !bump.includes(id))];
-          setFlashIds(new Set(bump));
-          setTimeout(() => setFlashIds(new Set()), 1200);
+          const promote = updated[updated.length - 1];
+          next = [promote, ...next.filter((id) => id !== promote)];
         }
         return next;
       });
     };
 
     tick();
-    const id = setInterval(tick, 2500);
+    const id = setInterval(tick, 2800);
     return () => clearInterval(id);
   }, []);
 
-  // Simulate activity feed bubbling every ~8s
+  // Periodically promote an existing item in each feed (smooth slide to top)
   useEffect(() => {
-    const samples = [
-      {
-        text: 'Telematics ping: TRK-12 speed change +8 km/h',
-        type: 'trip' as const,
-        href: '/trips',
-      },
-      {
-        text: 'Fuel request logged for VAN-05 — review cost',
-        type: 'fuel' as const,
-        href: '/fuel-expenses',
-      },
-      {
-        text: 'Shop queue: new diagnostic ticket opened',
-        type: 'maint' as const,
-        href: '/maintenance',
-      },
-      {
-        text: 'News: corridor congestion near Airport Cargo Hub',
-        type: 'news' as const,
-        href: '/trips',
-      },
-      {
-        text: 'Safety: score recalculated for 2 drivers',
-        type: 'alert' as const,
-        href: '/safety-command',
-      },
-    ];
     const id = setInterval(() => {
-      const pick = samples[Math.floor(Math.random() * samples.length)];
       setActivityFeed((prev) => {
-        const item: FeedItem = {
-          id: `live-${Date.now()}`,
-          text: pick.text,
-          time: 'Just now',
-          type: pick.type,
-          href: pick.href,
-          ts: Date.now(),
-        };
-        return [item, ...prev].slice(0, 12);
+        if (prev.length < 2) return prev;
+        // Prefer promoting something not already at top
+        const pick = prev[1 + Math.floor(Math.random() * Math.min(4, prev.length - 1))];
+        return bumpToTop(
+          prev.map((x) =>
+            x.id === pick.id ? { ...x, time: 'Just now', ts: Date.now() } : x
+          ),
+          pick.id
+        );
       });
-    }, 8000);
+
+      setTripCards((prev) => {
+        if (prev.length < 2) return prev;
+        const pick = prev[1 + Math.floor(Math.random() * Math.min(3, prev.length - 1))];
+        return bumpToTop(prev, pick.id);
+      });
+
+      setMaintCards((prev) => {
+        if (prev.length < 2) return prev;
+        const pick = prev[1 + Math.floor(Math.random() * Math.min(3, prev.length - 1))];
+        return bumpToTop(prev, pick.id);
+      });
+
+      setInsightCards((prev) => {
+        if (prev.length < 2) return prev;
+        const pick = prev[1 + Math.floor(Math.random() * Math.min(3, prev.length - 1))];
+        return bumpToTop(
+          prev.map((x) =>
+            x.id === pick.id ? { ...x, time: 'Just now', ts: Date.now() } : x
+          ),
+          pick.id
+        );
+      });
+    }, 7000);
     return () => clearInterval(id);
   }, []);
 
@@ -382,13 +467,13 @@ export default function Dashboard() {
   const highRiskDrivers = mockDrivers.filter((d) => d.safety_score < 75);
   const excellentDrivers = mockDrivers.filter((d) => d.safety_score >= 90);
   const scoreDistribution = [
-    { name: '90-100 Excellent', count: excellentDrivers.length, fill: '#10b981' },
+    { name: '90-100 Excellent', count: excellentDrivers.length, fill: 'hsl(var(--primary))' },
     {
       name: '75-89 Average',
       count: mockDrivers.length - highRiskDrivers.length - excellentDrivers.length,
-      fill: '#f59e0b',
+      fill: 'hsl(var(--muted-foreground))',
     },
-    { name: '<75 High Risk', count: highRiskDrivers.length, fill: '#ef4444' },
+    { name: '<75 High Risk', count: highRiskDrivers.length, fill: 'hsl(var(--destructive))' },
   ];
 
   const expiringLicenses = drivers.filter((d) => {
@@ -485,11 +570,17 @@ export default function Dashboard() {
     },
   ].filter((c) => (c.roles as readonly string[]).includes(role));
 
-  const newsItems = activityFeed.filter((a) => a.type === 'news' || a.type === 'alert');
-  const tripFeed = activityFeed.filter((a) => a.type === 'trip');
-  const maintFuelFeed = activityFeed.filter(
-    (a) => a.type === 'maint' || a.type === 'fuel'
-  );
+  const vehicleIds = liveList.map((x) => x.id);
+  const tripIds = tripCards.slice(0, 5).map((x) => x.id);
+  const activityIds = activityFeed.slice(0, 8).map((x) => x.id);
+  const maintIds = maintCards.slice(0, 5).map((x) => x.id);
+  const insightIds = insightCards.slice(0, 5).map((x) => x.id);
+
+  const setVehicleRef = useSmoothList(vehicleIds);
+  const setTripRef = useSmoothList(tripIds);
+  const setActivityRef = useSmoothList(activityIds);
+  const setMaintRef = useSmoothList(maintIds);
+  const setInsightRef = useSmoothList(insightIds);
 
   if (loading) {
     return (
@@ -509,41 +600,31 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
-            Operations command
-          </p>
-          <h2 className="text-lg font-bold tracking-tight">
-            {role} · live fleet dashboard
-          </h2>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline" className="gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            Live
-          </Badge>
+      {/* Header actions only — no role title line */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Badge variant="outline" className="gap-1.5">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          Live
+        </Badge>
 
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={openFilterModal}>
-            <Filter className="h-3.5 w-3.5" />
-            Filters
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px]">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-
-          {canAccess('trips', 'create') && (
-            <Link href="/trips?new=true" className={buttonVariants({ size: 'sm' })}>
-              Dispatch route
-            </Link>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={openFilterModal}>
+          <Filter className="h-3.5 w-3.5" />
+          Filters
+          {activeFilterCount > 0 && (
+            <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px]">
+              {activeFilterCount}
+            </Badge>
           )}
-        </div>
+        </Button>
+
+        {canAccess('trips', 'create') && (
+          <Link href="/trips?new=true" className={buttonVariants({ size: 'sm' })}>
+            Dispatch route
+          </Link>
+        )}
       </div>
 
       {/* Active filter chips */}
@@ -632,82 +713,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-<<<<<<< HEAD
-          <AIPredictionCard prediction={mockPrediction} vehicleReg="FLEET-T800" />
-
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Activity className="h-5 w-5" /> Safety score distribution
-              </CardTitle>
-              <CardDescription>Driver behavioral scores from telematics analytics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[220px]">
-                <ChartContainer
-                  config={{
-                    count: { label: 'Drivers' },
-                  }}
-                  className="h-full w-full"
-                >
-                  <BarChart
-                    data={scoreDistribution}
-                    layout="vertical"
-                    margin={{ left: 10, right: 30, top: 10, bottom: 10 }}
-                  >
-                    <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis type="number" hide />
-                    <YAxis
-                      dataKey="name"
-                      type="category"
-                      axisLine={false}
-                      tickLine={false}
-                      style={{ fontSize: '12px', fill: 'currentColor', fontWeight: 500 }}
-                      width={120}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                      {scoreDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ChartContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-4">
-          {/* Live vehicle status list */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
-                <Truck className="h-4 w-4" /> Live vehicle status
-              </CardTitle>
-              <CardDescription>Tap to focus on map</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-              {liveList.slice(0, 8).map(({ id, pos, vehicle, driver }) => {
-                const moving = (pos.speed || 0) > 3;
-                const selected = selectedVehicleId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setSelectedVehicleId(id === selectedVehicleId ? null : id)}
-                    className={`w-full text-left p-2.5 rounded-lg border transition-all cursor-pointer ${
-                      selected
-=======
-        {/* Live vehicle pulse strip — newest updates bubble to top */}
+        {/* Live vehicles — normal cards; updated unit slides to top */}
         <Card className="lg:col-span-4 flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Radio className="h-4 w-4 text-emerald-500" /> Live vehicles
             </CardTitle>
             <CardDescription className="text-[11px]">
-              Updates jump to the top · click to focus map
+              On update, unit slides to the top · click to focus map
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-2 overflow-y-auto max-h-[440px]">
@@ -717,25 +730,21 @@ export default function Dashboard() {
             {liveList.map(({ id, pos, vehicle, driver }) => {
               const moving = (pos.speed || 0) > 3;
               const selected = selectedVehicleId === id;
-              const flash = flashIds.has(id);
               return (
                 <button
                   key={id}
+                  ref={(el) => setVehicleRef(id, el)}
                   type="button"
                   onClick={() => setSelectedVehicleId(id === selectedVehicleId ? null : id)}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all duration-500 cursor-pointer ${
-                    flash
-                      ? 'border-emerald-500 bg-emerald-500/10 shadow-md scale-[1.02] z-10'
-                      : selected
->>>>>>> 0ec4bba9a0bae20c84df235178480c71f0265120
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                        : 'border-border hover:bg-muted/50'
+                  className={`w-full text-left p-2.5 rounded-xl border cursor-pointer ${
+                    selected
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                      : 'border-border hover:bg-muted/50'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate flex items-center gap-1.5">
-                        {flash && <Sparkles className="h-3 w-3 text-emerald-500 animate-pulse" />}
+                      <div className="font-semibold text-sm truncate">
                         {vehicle?.registration_number}
                       </div>
                       <div className="text-[10px] text-muted-foreground truncate">
@@ -777,9 +786,8 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Live trips · activity · news · role modules */}
+      {/* Live trips · activity · maint · insights */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {/* Live / new trips */}
         {canAccess('trips', 'read') && (
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
@@ -789,45 +797,39 @@ export default function Dashboard() {
               <CardDescription className="text-[11px]">Click any card → Trips</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 flex-1">
-              {activeTrips.slice(0, 3).map((t) => (
+              {tripCards.slice(0, 5).map((t) => (
                 <Link
                   key={t.id}
+                  ref={(el) => setTripRef(t.id, el)}
                   href="/trips"
-                  className="block p-2.5 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  className={`block p-2.5 border rounded-lg hover:bg-muted/50 ${
+                    t.kind === 'draft' ? 'border-dashed border-border' : 'border-border'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-xs font-bold">#{t.trip_number}</div>
                       <div className="text-[10px] text-muted-foreground truncate">
+                        {t.kind === 'draft' ? 'Draft · ' : ''}
                         {t.source} → {t.destination}
                       </div>
                     </div>
-                    <Badge className="text-[9px] shrink-0 gap-1">
-                      <CircleDot className="h-3 w-3" /> Live
+                    <Badge
+                      variant={t.kind === 'live' ? 'default' : 'secondary'}
+                      className="text-[9px] shrink-0 gap-1"
+                    >
+                      {t.kind === 'live' ? (
+                        <>
+                          <CircleDot className="h-3 w-3" /> Live
+                        </>
+                      ) : (
+                        'New'
+                      )}
                     </Badge>
                   </div>
                 </Link>
               ))}
-              {draftTrips.slice(0, 2).map((t) => (
-                <Link
-                  key={t.id}
-                  href="/trips"
-                  className="block p-2.5 border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold">#{t.trip_number}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        Draft · {t.source} → {t.destination}
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="text-[9px]">
-                      New
-                    </Badge>
-                  </div>
-                </Link>
-              ))}
-              {activeTrips.length === 0 && draftTrips.length === 0 && (
+              {tripCards.length === 0 && (
                 <p className="text-xs text-muted-foreground">No active or draft trips.</p>
               )}
               <Link
@@ -840,22 +842,20 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Live activity feed */}
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Activity className="h-4 w-4" /> Live activity
             </CardTitle>
-            <CardDescription className="text-[11px]">Newest events float up</CardDescription>
+            <CardDescription className="text-[11px]">Updates slide to the top</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 flex-1 max-h-[320px] overflow-y-auto">
-            {activityFeed.slice(0, 8).map((item, idx) => (
+            {activityFeed.slice(0, 8).map((item) => (
               <Link
                 key={item.id}
+                ref={(el) => setActivityRef(item.id, el)}
                 href={item.href}
-                className={`flex items-start gap-2 p-2 rounded-lg border transition-all hover:bg-muted/50 ${
-                  idx === 0 ? 'border-primary/40 bg-primary/5' : 'border-border/60'
-                }`}
+                className="flex items-start gap-2 p-2 rounded-lg border border-border/60 hover:bg-muted/50"
               >
                 {feedIcon(item.type)}
                 <div className="min-w-0 flex-1">
@@ -868,7 +868,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Maintenance & fuel requests */}
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -877,31 +876,23 @@ export default function Dashboard() {
             <CardDescription className="text-[11px]">Service queue & cost desk</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 flex-1">
-            {openMaintenance.slice(0, 3).map((log) => (
+            {maintCards.slice(0, 5).map((card) => (
               <Link
-                key={log.id}
-                href="/maintenance"
-                className="block p-2.5 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                key={card.id}
+                ref={(el) => setMaintRef(card.id, el)}
+                href={card.href}
+                className="block p-2.5 border border-border rounded-lg hover:bg-muted/50"
               >
-                <div className="text-xs font-semibold">
-                  {log.vehicle?.registration_number || 'Unit'}
-                </div>
+                <div className="text-xs font-semibold">{card.reg}</div>
                 <div className="text-[10px] text-muted-foreground line-clamp-2">
-                  {log.description}
+                  {card.description}
                 </div>
-                <Badge variant="destructive" className="text-[9px] mt-1.5">
-                  In Shop
+                <Badge
+                  variant={card.kind === 'maint' ? 'destructive' : 'secondary'}
+                  className="text-[9px] mt-1.5"
+                >
+                  {card.kind === 'maint' ? 'In Shop' : 'Fuel'}
                 </Badge>
-              </Link>
-            ))}
-            {maintFuelFeed.slice(0, 2).map((item) => (
-              <Link
-                key={item.id}
-                href={item.href}
-                className="flex items-start gap-2 p-2 rounded-lg border border-border/60 hover:bg-muted/50 text-[11px]"
-              >
-                {feedIcon(item.type)}
-                <span className="line-clamp-2">{item.text}</span>
               </Link>
             ))}
             <div className="grid grid-cols-2 gap-2 pt-1">
@@ -921,7 +912,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* News + role insights */}
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -930,9 +920,10 @@ export default function Dashboard() {
             <CardDescription className="text-[11px]">{role} focus</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 flex-1">
-            {newsItems.slice(0, 3).map((item) => (
+            {insightCards.slice(0, 4).map((item) => (
               <Link
                 key={item.id}
+                ref={(el) => setInsightRef(item.id, el)}
                 href={item.href}
                 className="flex items-start gap-2 p-2 rounded-lg border border-border/60 hover:bg-muted/50"
               >
