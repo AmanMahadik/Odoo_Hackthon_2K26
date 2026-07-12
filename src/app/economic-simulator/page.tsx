@@ -3,32 +3,64 @@
 import React, { useState, useEffect } from 'react';
 import { economicService } from '@/lib/mockServices';
 import { mockMonthlyFinancials } from '@/lib/mockData';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Line, ComposedChart } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, DollarSign, Brain, Download, Zap } from 'lucide-react';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from '@/components/ui/chart';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Line,
+  ComposedChart,
+} from 'recharts';
+import {
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Download,
+  Zap,
+  Sliders,
+  Fuel,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 const chartConfig = {
-  revenue: { label: "Revenue", color: "#fbbf24" },
-  fuel: { label: "Fuel Cost", color: "hsl(var(--destructive))" },
-  maintenance: { label: "Maintenance", color: "hsl(var(--chart-3))" },
-  labor: { label: "Labor", color: "hsl(var(--chart-4))" },
-  other: { label: "Other", color: "hsl(var(--muted-foreground))" },
+  revenue: { label: 'Revenue', color: '#fbbf24' },
+  fuel: { label: 'Fuel', color: '#f87171' },
+  maintenance: { label: 'Maintenance', color: '#60a5fa' },
+  labor: { label: 'Labor', color: '#a78bfa' },
+  other: { label: 'Other', color: '#94a3b8' },
 };
 
 export default function EconomicSimulatorPage() {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const chartTick = isDark ? '#e2e8f0' : '#334155';
+  const chartGrid = isDark ? '#334155' : '#e2e8f0';
+
   const [fuelPrice, setFuelPrice] = useState<any>(null);
   const [fuelForecast, setFuelForecast] = useState<any[]>([]);
-  
-  // Simulator State
-  const [fuelChange, setFuelChange] = useState([0]);
-  const [maintChange, setMaintChange] = useState([0]);
-  const [fleetChange, setFleetChange] = useState([0]);
-  const [demandChange, setDemandChange] = useState([0]);
-  
+  const [fuelChange, setFuelChange] = useState(0);
+  const [maintChange, setMaintChange] = useState(0);
+  const [fleetChange, setFleetChange] = useState(0);
+  const [demandChange, setDemandChange] = useState(0);
   const [simResult, setSimResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,116 +68,220 @@ export default function EconomicSimulatorPage() {
     async function load() {
       const [fPrice, fForecast] = await Promise.all([
         economicService.getFuelPrice(),
-        economicService.getFuelForecast()
+        economicService.getFuelForecast(),
       ]);
       setFuelPrice(fPrice);
       setFuelForecast(fForecast);
-      runSim();
       setLoading(false);
     }
     load();
   }, []);
 
-  // Run simulation when sliders change
   const runSim = async () => {
     const res = await economicService.simulateScenario({
-      fuelPriceChange: fuelChange[0],
-      maintenanceCostChange: maintChange[0],
-      fleetSizeChange: fleetChange[0],
-      demandChange: demandChange[0]
+      fuelPriceChange: fuelChange,
+      maintenanceCostChange: maintChange,
+      fleetSizeChange: fleetChange,
+      demandChange,
     });
     setSimResult(res);
   };
 
   useEffect(() => {
-    // Debounce simulation on slider change
     const t = setTimeout(runSim, 300);
     return () => clearTimeout(t);
   }, [fuelChange, maintChange, fleetChange, demandChange]);
 
   const getTrendIcon = (trend: string) => {
-    if (trend === 'rising') return <TrendingUp className="h-4 w-4 text-destructive" />;
-    if (trend === 'falling') return <TrendingDown className="h-4 w-4 text-emerald-500" />;
-    return <Minus className="h-4 w-4 text-muted-foreground" />;
+    if (trend === 'rising') return <TrendingUp className="h-3.5 w-3.5 text-destructive" />;
+    if (trend === 'falling') return <TrendingDown className="h-3.5 w-3.5 text-emerald-500" />;
+    return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
   };
 
+  const money = (n: number) =>
+    n.toLocaleString(undefined, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <DollarSign className="h-6 w-6 text-primary" /> Economics Scenario Lab
-        </h2>
-        <p className="text-sm text-muted-foreground">AI-driven financial modeling and macro-economic impact simulator.</p>
+    <div className="space-y-5 font-normal">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl tracking-tight font-medium">Economics scenario lab</h2>
+          <p className="text-sm text-muted-foreground">
+            Model fuel, labor, and demand swings against operating cost
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="font-normal gap-1.5 shrink-0">
+          <Download className="h-4 w-4" /> Export scenario
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Market Indicators */}
-        <div className="space-y-6 lg:col-span-1">
-          {/* Fuel Widget */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground uppercase tracking-widest">Global Fuel Index</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="pt-5 text-center space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+              Global fuel index
+            </span>
+            {fuelPrice ? (
+              <>
+                <span className="text-2xl tabular-nums font-medium block">
+                  ${Number(fuelPrice.price).toFixed(2)}
+                  <span className="text-sm text-muted-foreground font-normal"> / L</span>
+                </span>
+                <Badge
+                  variant="outline"
+                  className={`gap-1 font-normal ${
+                    fuelPrice.trend === 'rising'
+                      ? 'text-destructive border-destructive/40'
+                      : 'text-emerald-500 border-emerald-500/40'
+                  }`}
+                >
+                  {getTrendIcon(fuelPrice.trend)} {fuelPrice.changePercent}%
+                </Badge>
+              </>
+            ) : (
+              <div className="h-10 animate-pulse bg-muted rounded-md" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 text-center space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+              Projected monthly OpEx
+            </span>
+            {simResult ? (
+              <>
+                <span className="text-2xl tabular-nums font-medium block">
+                  ${money(simResult.simulatedMonthlyCost)}
+                </span>
+                <Badge
+                  variant={simResult.changePercent > 0 ? 'destructive' : 'secondary'}
+                  className="font-normal"
+                >
+                  {simResult.changePercent > 0 ? '+' : ''}
+                  {simResult.changePercent}% vs base
+                </Badge>
+              </>
+            ) : (
+              <div className="h-10 animate-pulse bg-muted rounded-md" />
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 text-center space-y-1">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider block">
+              Net impact with AI
+            </span>
+            {simResult ? (
+              <>
+                <span
+                  className={`text-2xl tabular-nums font-medium block ${
+                    simResult.netImpactWithAI > 0 ? 'text-amber-500' : 'text-emerald-500'
+                  }`}
+                >
+                  {simResult.netImpactWithAI > 0 ? '+' : '−'}$
+                  {money(Math.abs(simResult.netImpactWithAI))}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  After recommended mitigations
+                </span>
+              </>
+            ) : (
+              <div className="h-10 animate-pulse bg-muted rounded-md" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="space-y-3 lg:col-span-1">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Fuel className="h-4 w-4" /> Fuel price forecast
+              </CardTitle>
+              <CardDescription className="font-normal">
+                Forward curve used in scenario baselining
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {fuelPrice ? (
+              {loading ? (
+                <div className="h-[140px] animate-pulse bg-muted rounded-lg" />
+              ) : (
                 <>
-                  <div className="flex justify-between items-end mb-6">
-                    <div>
-                      <span className="text-3xl font-extrabold">${fuelPrice.price}</span>
-                      <span className="text-sm text-muted-foreground ml-1">/ L</span>
-                    </div>
-                    <Badge variant="outline" className={`gap-1 ${fuelPrice.trend === 'rising' ? 'text-destructive border-destructive/50 bg-destructive/10' : 'text-emerald-500 border-emerald-500/50 bg-emerald-500/10'}`}>
-                      {getTrendIcon(fuelPrice.trend)} {fuelPrice.changePercent}%
-                    </Badge>
-                  </div>
-                  
-                  <div className="h-[120px]">
-                    <ChartContainer config={{ price: { label: "Forecast Price", color: "#fbbf24" } }}>
-                      <AreaChart data={fuelForecast}>
+                  <div className="h-[140px] w-full">
+                    <ChartContainer
+                      config={{ price: { label: 'Price', color: '#fbbf24' } }}
+                      className="h-full w-full aspect-auto"
+                    >
+                      <AreaChart data={fuelForecast} margin={{ left: 0, right: 4, top: 4, bottom: 0 }}>
                         <defs>
-                          <linearGradient id="fillPrice" x1="0" y1="0" x2="0" y2="1">
+                          <linearGradient id="fillPriceEco" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.35} />
                             <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Area dataKey="price" type="monotone" stroke="#fbbf24" fill="url(#fillPrice)" strokeWidth={2.5} />
+                        <Area
+                          dataKey="price"
+                          type="monotone"
+                          stroke="#fbbf24"
+                          fill="url(#fillPriceEco)"
+                          strokeWidth={2}
+                        />
                       </AreaChart>
                     </ChartContainer>
                   </div>
-                  
-                  <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                    <p className="text-xs text-primary font-medium flex items-start gap-2">
-                      <Brain className="h-4 w-4 shrink-0" /> AI suggests locking fuel contracts this week before anticipated 8% hike.
-                    </p>
-                  </div>
+                  <p className="mt-3 text-[11px] text-muted-foreground leading-snug flex items-start gap-2">
+                    <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5 text-foreground" />
+                    Consider locking fuel contracts this week ahead of a projected near-term hike.
+                  </p>
                 </>
-              ) : (
-                <div className="h-40 animate-pulse bg-muted rounded-lg"></div>
               )}
             </CardContent>
           </Card>
 
-          {/* Cost Impact Chart (Historical) */}
-          <Card className="border-border/50 flex-1">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground uppercase tracking-widest">OpEx vs Revenue Trend</CardTitle>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">OpEx vs revenue trend</CardTitle>
+              <CardDescription className="font-normal">
+                Monthly stack of costs against revenue line
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[250px] mt-4">
-                <ChartContainer config={chartConfig} className="h-full w-full">
-                  <ComposedChart data={mockMonthlyFinancials} margin={{ left: -15, right: 10 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(v) => v.slice(0,3)} style={{ fontSize: '10px', fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} style={{ fontSize: '10px', fill: 'hsl(var(--muted-foreground))' }} />
+              <div className="h-[240px] w-full">
+                <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
+                  <ComposedChart
+                    data={mockMonthlyFinancials}
+                    margin={{ left: -8, right: 8, top: 4, bottom: 0 }}
+                  >
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={chartGrid} />
+                    <XAxis
+                      dataKey="month"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      tickFormatter={(v) => String(v).slice(0, 3)}
+                      tick={{ fill: chartTick, fontSize: 10 }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `$${v / 1000}k`}
+                      tick={{ fill: chartTick, fontSize: 10 }}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="fuel" stackId="a" fill="var(--color-fuel)" radius={[0,0,4,4]} />
-                    <Bar dataKey="maintenance" stackId="a" fill="var(--color-maintenance)" />
-                    <Bar dataKey="labor" stackId="a" fill="var(--color-labor)" />
-                    <Bar dataKey="other" stackId="a" fill="var(--color-other)" radius={[4,4,0,0]} />
-                    <Line type="monotone" dataKey="revenue" stroke="var(--color-revenue)" strokeWidth={3} dot={{ r: 4, fill: "var(--background)", strokeWidth: 2 }} />
-                    <ChartLegend content={<ChartLegendContent />} className="pt-4 text-xs" />
+                    <Bar dataKey="fuel" stackId="a" fill="#f87171" radius={[0, 0, 2, 2]} />
+                    <Bar dataKey="maintenance" stackId="a" fill="#60a5fa" />
+                    <Bar dataKey="labor" stackId="a" fill="#a78bfa" />
+                    <Bar dataKey="other" stackId="a" fill="#94a3b8" radius={[2, 2, 0, 0]} />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#fbbf24"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#fbbf24', strokeWidth: 0 }}
+                    />
+                    <ChartLegend content={<ChartLegendContent />} className="pt-2 text-xs" />
                   </ComposedChart>
                 </ChartContainer>
               </div>
@@ -153,108 +289,162 @@ export default function EconomicSimulatorPage() {
           </Card>
         </div>
 
-        {/* Economic Simulator */}
-        <Card className="lg:col-span-2 border-border/50 bg-card shadow-xl overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <TrendingUp className="h-64 w-64" />
-          </div>
-          
-          <CardHeader className="border-b border-border/50 bg-muted/20 pb-4">
-            <CardTitle>Scenario Simulator</CardTitle>
-            <CardDescription>Adjust macro-economic factors to see projected impact on operating costs.</CardDescription>
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Sliders className="h-4 w-4" /> Scenario parameters
+            </CardTitle>
+            <CardDescription className="font-normal">
+              Adjust macro factors to project operating cost impact
+            </CardDescription>
           </CardHeader>
-          
-          <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-            
-            {/* Sliders */}
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm font-medium">Fuel Price Change</label>
-                  <span className="text-sm font-mono text-muted-foreground">{fuelChange[0] > 0 ? '+' : ''}{fuelChange[0]}%</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Fuel price change</span>
+                  <span className="tabular-nums">
+                    {fuelChange > 0 ? `+${fuelChange}%` : `${fuelChange}%`}
+                  </span>
                 </div>
-                <Slider value={fuelChange} onValueChange={(val) => setFuelChange(Array.isArray(val) ? val : [val])} min={-50} max={50} step={1} className="w-full" />
+                <Slider
+                  value={[fuelChange]}
+                  min={-50}
+                  max={50}
+                  step={1}
+                  onValueChange={(v) => setFuelChange(Array.isArray(v) ? v[0] : v)}
+                />
               </div>
-
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm font-medium">Maintenance Costs</label>
-                  <span className="text-sm font-mono text-muted-foreground">{maintChange[0] > 0 ? '+' : ''}{maintChange[0]}%</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Maintenance costs</span>
+                  <span className="tabular-nums">
+                    {maintChange > 0 ? `+${maintChange}%` : `${maintChange}%`}
+                  </span>
                 </div>
-                <Slider value={maintChange} onValueChange={(val) => setMaintChange(Array.isArray(val) ? val : [val])} min={-30} max={50} step={1} className="w-full" />
+                <Slider
+                  value={[maintChange]}
+                  min={-30}
+                  max={50}
+                  step={1}
+                  onValueChange={(v) => setMaintChange(Array.isArray(v) ? v[0] : v)}
+                />
               </div>
-
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm font-medium">Fleet Size Change</label>
-                  <span className="text-sm font-mono text-muted-foreground">{fleetChange[0] > 0 ? '+' : ''}{fleetChange[0]}%</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Fleet size change</span>
+                  <span className="tabular-nums">
+                    {fleetChange > 0 ? `+${fleetChange}%` : `${fleetChange}%`}
+                  </span>
                 </div>
-                <Slider value={fleetChange} onValueChange={(val) => setFleetChange(Array.isArray(val) ? val : [val])} min={-20} max={30} step={1} className="w-full" />
+                <Slider
+                  value={[fleetChange]}
+                  min={-20}
+                  max={30}
+                  step={1}
+                  onValueChange={(v) => setFleetChange(Array.isArray(v) ? v[0] : v)}
+                />
               </div>
-
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm font-medium">Demand / Trips Volume</label>
-                  <span className="text-sm font-mono text-muted-foreground">{demandChange[0] > 0 ? '+' : ''}{demandChange[0]}%</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Demand / trip volume</span>
+                  <span className="tabular-nums">
+                    {demandChange > 0 ? `+${demandChange}%` : `${demandChange}%`}
+                  </span>
                 </div>
-                <Slider value={demandChange} onValueChange={(val) => setDemandChange(Array.isArray(val) ? val : [val])} min={-30} max={30} step={1} className="w-full" />
+                <Slider
+                  value={[demandChange]}
+                  min={-30}
+                  max={30}
+                  step={1}
+                  onValueChange={(v) => setDemandChange(Array.isArray(v) ? v[0] : v)}
+                />
               </div>
-
-              <div className="pt-4 flex gap-3">
-                <Button variant="outline" className="w-full" onClick={() => { setFuelChange([0]); setMaintChange([0]); setFleetChange([0]); setDemandChange([0]); }}>Reset Defaults</Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full font-normal"
+                onClick={() => {
+                  setFuelChange(0);
+                  setMaintChange(0);
+                  setFleetChange(0);
+                  setDemandChange(0);
+                }}
+              >
+                Reset defaults
+              </Button>
             </div>
 
-            {/* Results Panel */}
-            <div className="bg-background rounded-xl border border-border p-6 shadow-inner space-y-6">
+            <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-5">
               {simResult ? (
                 <>
                   <div>
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Projected Monthly OpEx</h3>
-                    <div className="flex items-end gap-3 mb-2">
-                      <div className="text-4xl font-extrabold tracking-tight">${simResult.simulatedMonthlyCost.toLocaleString()}</div>
-                      <Badge variant={simResult.changePercent > 0 ? 'destructive' : 'default'} className="mb-1 text-sm h-7">
-                        {simResult.changePercent > 0 ? '+' : ''}{simResult.changePercent}%
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-2">
+                      Base monthly cost
+                    </span>
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                      ${money(simResult.currentMonthlyCost)}
+                    </span>
+                    <div className="mt-3 flex items-end gap-2">
+                      <span className="text-2xl font-medium tabular-nums tracking-tight">
+                        ${money(simResult.simulatedMonthlyCost)}
+                      </span>
+                      <Badge
+                        variant={simResult.changePercent > 0 ? 'destructive' : 'secondary'}
+                        className="mb-0.5 font-normal"
+                      >
+                        {simResult.changePercent > 0 ? '+' : ''}
+                        {simResult.changePercent}%
                       </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Base Cost: ${simResult.currentMonthlyCost.toLocaleString()}
                     </div>
                   </div>
 
-                  <div className="border-t border-border/60 pt-4">
-                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <Zap className="h-3.5 w-3.5 text-primary" /> AI Mitigations
+                  <div className="border-t border-border pt-4 space-y-3">
+                    <h3 className="text-sm font-medium flex items-center gap-1.5">
+                      <Zap className="h-3.5 w-3.5" /> AI mitigations
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {simResult.recommendations.map((r: any, i: number) => (
-                        <div key={i} className="flex justify-between items-start text-sm bg-muted/40 p-2.5 rounded-lg border border-border/50">
-                          <div className="pr-4">
-                            <span className="font-medium text-foreground block">{r.action}</span>
-                            <span className="text-[10px] text-muted-foreground leading-tight">{r.impact}</span>
+                        <div
+                          key={i}
+                          className="flex justify-between items-start gap-3 text-sm rounded-lg border border-border bg-background p-2.5"
+                        >
+                          <div className="min-w-0">
+                            <span className="font-medium block text-sm">{r.action}</span>
+                            <span className="text-[11px] text-muted-foreground leading-snug">
+                              {r.impact}
+                            </span>
                           </div>
-                          <span className="font-mono text-emerald-500 font-bold shrink-0">-${r.savings}</span>
+                          <span className="tabular-nums text-emerald-500 font-medium shrink-0 text-sm">
+                            −${r.savings}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex justify-between items-center">
-                    <span className="font-semibold text-primary text-sm">Net Impact with AI:</span>
-                    <span className={`font-mono font-bold text-lg ${simResult.netImpactWithAI > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                      {simResult.netImpactWithAI > 0 ? '+' : ''}{simResult.netImpactWithAI > 0 ? '$' : '-$'}{Math.abs(simResult.netImpactWithAI).toLocaleString()}
+                  <div className="rounded-lg border border-border bg-background p-3 flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Net impact with AI</span>
+                    <span
+                      className={`tabular-nums font-medium ${
+                        simResult.netImpactWithAI > 0 ? 'text-amber-500' : 'text-emerald-500'
+                      }`}
+                    >
+                      {simResult.netImpactWithAI > 0 ? '+' : '−'}$
+                      {money(Math.abs(simResult.netImpactWithAI))}
                     </span>
                   </div>
-                  
-                  <Button className="w-full gap-2">
-                    <Download className="h-4 w-4" /> Export Scenario PDF
+
+                  <Button size="sm" className="w-full font-normal gap-1.5">
+                    <Download className="h-4 w-4" /> Export scenario PDF
                   </Button>
                 </>
               ) : (
-                <div className="h-full flex items-center justify-center animate-pulse">Calculating model...</div>
+                <div className="h-full min-h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                  Calculating model…
+                </div>
               )}
             </div>
-            
           </CardContent>
         </Card>
       </div>
