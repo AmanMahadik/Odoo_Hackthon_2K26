@@ -136,24 +136,120 @@ export const registryService = {
 // 3. GPS SERVICE
 // ============================================
 
+// Mutable progress state for live route simulation (module-level)
+const routeProgress: Record<string, number> = {
+  v2: 0.35,
+  v5: 0.55,
+  v7: 0.4,
+};
+
+const vehicleRouteMap: Record<string, string> = {
+  v2: 'route_2',
+  v5: 'route_3',
+  v7: 'route_1',
+};
+
+const vehicleDriverMap: Record<string, string> = {
+  v2: 'd2',
+  v5: 'd4',
+  v7: 'd5',
+  v1: 'd1',
+  v4: 'd3',
+  v6: 'd6',
+  v8: 'd5',
+  v9: 'd7',
+};
+
 export const gpsService = {
   /** Get current positions of all active vehicles */
-  getFleetPositions(): Record<string, { lat: number; lng: number; speed: number; heading: number; fuel_percent: number; cargo_kg: number; cargo_max: number; destination: string; eta_minutes: number }> {
-    // Add slight random variation to simulate movement
-    const positions = { ...mockVehiclePositions };
-    for (const key in positions) {
-      const p = positions[key];
-      if (p.speed > 0) {
-        positions[key] = {
-          ...p,
-          lat: p.lat + (Math.random() - 0.5) * 0.002,
-          lng: p.lng + (Math.random() - 0.5) * 0.002,
-          speed: p.speed + (Math.random() - 0.5) * 10,
-          eta_minutes: Math.max(0, p.eta_minutes - Math.floor(Math.random() * 2)),
-        };
-      }
+  getFleetPositions(): Record<
+    string,
+    {
+      lat: number;
+      lng: number;
+      speed: number;
+      heading: number;
+      fuel_percent: number;
+      cargo_kg: number;
+      cargo_max: number;
+      destination: string;
+      eta_minutes: number;
     }
-    return positions;
+  > {
+    return this.getLiveFleetState().positions;
+  },
+
+  /**
+   * Live fleet state: animates vehicles along predefined routes,
+   * returns current positions + full route polylines for map rendering.
+   */
+  getLiveFleetState(): {
+    positions: Record<
+      string,
+      {
+        lat: number;
+        lng: number;
+        speed: number;
+        heading: number;
+        fuel_percent: number;
+        cargo_kg: number;
+        cargo_max: number;
+        destination: string;
+        eta_minutes: number;
+        progress?: number;
+        routeId?: string;
+      }
+    >;
+    routes: Record<string, { lat: number; lng: number }[]>;
+  } {
+    const positions: Record<string, any> = {};
+    const routes: Record<string, { lat: number; lng: number }[]> = {};
+
+    // Advance progress for vehicles on active routes
+    for (const [vehicleId, routeId] of Object.entries(vehicleRouteMap)) {
+      const points = mockGPSRoutes[routeId];
+      if (!points?.length) continue;
+
+      let progress = routeProgress[vehicleId] ?? 0.2;
+      progress += 0.015 + Math.random() * 0.01;
+      if (progress >= 0.98) progress = 0.05;
+      routeProgress[vehicleId] = progress;
+
+      const idx = Math.min(Math.floor(progress * (points.length - 1)), points.length - 2);
+      const a = points[idx];
+      const b = points[idx + 1];
+      const segT = progress * (points.length - 1) - idx;
+      const base = mockVehiclePositions[vehicleId];
+
+      positions[vehicleId] = {
+        lat: a.lat + (b.lat - a.lat) * segT + (Math.random() - 0.5) * 0.0003,
+        lng: a.lng + (b.lng - a.lng) * segT + (Math.random() - 0.5) * 0.0003,
+        speed: Math.max(5, a.speed + (b.speed - a.speed) * segT + (Math.random() - 0.5) * 4),
+        heading: a.heading,
+        fuel_percent: base?.fuel_percent ?? 60,
+        cargo_kg: base?.cargo_kg ?? 0,
+        cargo_max: base?.cargo_max ?? 1000,
+        destination: base?.destination ?? 'En route',
+        eta_minutes: Math.max(1, Math.round((1 - progress) * (base?.eta_minutes || 40))),
+        progress,
+        routeId,
+      };
+
+      routes[vehicleId] = points.map((p) => ({ lat: p.lat, lng: p.lng }));
+    }
+
+    // Idle / non-routed vehicles stay near base positions
+    for (const [key, p] of Object.entries(mockVehiclePositions)) {
+      if (positions[key]) continue;
+      positions[key] = {
+        ...p,
+        lat: p.lat + (Math.random() - 0.5) * 0.0002,
+        lng: p.lng + (Math.random() - 0.5) * 0.0002,
+        progress: 0,
+      };
+    }
+
+    return { positions, routes };
   },
 
   /** Get route points for a given route */
@@ -167,7 +263,11 @@ export const gpsService = {
   },
 
   /** Simulate position update (for animation) */
-  simulateMovement(currentPos: { lat: number; lng: number }, routePoints: GPSRoutePoint[], progress: number): { lat: number; lng: number; speed: number; heading: number } {
+  simulateMovement(
+    _currentPos: { lat: number; lng: number },
+    routePoints: GPSRoutePoint[],
+    progress: number
+  ): { lat: number; lng: number; speed: number; heading: number } {
     const idx = Math.min(Math.floor(progress * routePoints.length), routePoints.length - 1);
     const point = routePoints[idx];
     return {
@@ -179,21 +279,20 @@ export const gpsService = {
   },
 
   /** Get driver info for a vehicle (for info chip) */
-  getDriverForVehicle(vehicleId: string): { driver: typeof mockDrivers[0]; vehicle: typeof mockVehicles[0] } | null {
-    // Map vehicles to drivers via active trips
-    const vehicleDriverMap: Record<string, string> = {
-      'v2': 'd2',  // TRK-12 → Sarah Chen
-      'v5': 'd4',  // TRK-07 → Emily Davis
-      'v7': 'd5',  // BUS-01 → James Wilson
-    };
-
+  getDriverForVehicle(
+    vehicleId: string
+  ): { driver: (typeof mockDrivers)[0]; vehicle: (typeof mockVehicles)[0] } | null {
     const driverId = vehicleDriverMap[vehicleId];
-    if (!driverId) return null;
+    const vehicle = mockVehicles.find((v) => v.id === vehicleId);
+    if (!vehicle) return null;
 
-    const driver = mockDrivers.find(d => d.id === driverId);
-    const vehicle = mockVehicles.find(v => v.id === vehicleId);
+    // Prefer mapped driver; fall back to any available for idle units
+    const driver =
+      (driverId ? mockDrivers.find((d) => d.id === driverId) : undefined) ||
+      mockDrivers.find((d) => d.status === 'Available') ||
+      mockDrivers[0];
 
-    if (!driver || !vehicle) return null;
+    if (!driver) return null;
     return { driver, vehicle };
   },
 };

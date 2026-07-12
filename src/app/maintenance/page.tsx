@@ -3,33 +3,61 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
-import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, MaintenanceLog } from '@/lib/mockData';
-import { 
-  Plus, 
-  Wrench, 
-  CheckCircle, 
-  Clock, 
-  IndianRupee, 
+import {
+  Plus,
+  Wrench,
+  CheckCircle,
+  Clock,
+  DollarSign,
   AlertTriangle,
-  X,
-  Trash2
+  Search,
+  Filter,
+  Trash2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 export default function MaintenancePage() {
   const { canAccess } = useRole();
   const [logs, setLogs] = useState<MaintenanceLog[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Open' | 'Closed'>('All');
 
-  // Form State
   const [isOpen, setIsOpen] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [description, setDescription] = useState('');
   const [estimatedCost, setEstimatedCost] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  // Close log state
   const [closeOpen, setCloseOpen] = useState(false);
   const [closingLogId, setClosingLogId] = useState('');
   const [finalCost, setFinalCost] = useState('');
@@ -38,13 +66,9 @@ export default function MaintenancePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [mLogs, vList] = await Promise.all([
-        db.getMaintenanceLogs(),
-        db.getVehicles()
-      ]);
+      const [mLogs, vList] = await Promise.all([db.getMaintenanceLogs(), db.getVehicles()]);
       setLogs(mLogs);
-      // Filter out retired vehicles for new logs
-      setVehicles(vList.filter(v => v.status !== 'Retired'));
+      setVehicles(vList.filter((v) => v.status !== 'Retired'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -56,8 +80,6 @@ export default function MaintenancePage() {
     fetchData();
   }, []);
 
-  useRealtimeSync('maintenance_logs', fetchData);
-
   const handleOpenMaintenance = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -67,20 +89,22 @@ export default function MaintenancePage() {
       return;
     }
 
-    const vehicle = vehicles.find(v => v.id === selectedVehicleId);
+    const vehicle = vehicles.find((v) => v.id === selectedVehicleId);
     if (vehicle && vehicle.status === 'On Trip') {
-      setErrorMsg(`Vehicle ${vehicle.registration_number} is currently On Trip and cannot be scheduled for shop check-in.`);
+      setErrorMsg(
+        `Vehicle ${vehicle.registration_number} is currently On Trip and cannot be checked into shop.`
+      );
       return;
     }
 
+    setSubmitting(true);
     try {
       await db.createMaintenanceLog({
         vehicle_id: selectedVehicleId,
         description: description.trim(),
         cost: Number(estimatedCost),
-        status: 'Open'
+        status: 'Open',
       });
-
       setSelectedVehicleId('');
       setDescription('');
       setEstimatedCost('');
@@ -88,6 +112,8 @@ export default function MaintenancePage() {
       fetchData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Error logging maintenance.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -101,24 +127,24 @@ export default function MaintenancePage() {
   const handleCloseMaintenance = async (e: React.FormEvent) => {
     e.preventDefault();
     setCloseError('');
-
     if (!finalCost) {
       setCloseError('Please enter final cost.');
       return;
     }
-
+    setSubmitting(true);
     try {
       await db.updateMaintenanceLog(closingLogId, {
         status: 'Closed',
         cost: Number(finalCost),
-        closed_at: new Date().toISOString()
+        closed_at: new Date().toISOString(),
       });
-
       setCloseOpen(false);
       setClosingLogId('');
       fetchData();
     } catch (err: any) {
       setCloseError(err.message || 'Error closing log.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -132,264 +158,322 @@ export default function MaintenancePage() {
     }
   };
 
-  const getStatusBadge = (status: MaintenanceLog['status']) => {
-    switch (status) {
-      case 'Open':
-        return (
-          <span className="px-2.5 py-1 bg-red-500/10 border border-red-500/20 text-red-400 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-            <Clock className="h-3.5 w-3.5" /> In Shop
-          </span>
-        );
-      case 'Closed':
-        return (
-          <span className="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-semibold flex items-center gap-1.5 w-fit">
-            <CheckCircle className="h-3.5 w-3.5" /> Serviced
-          </span>
-        );
-    }
-  };
+    const filtered = logs.filter((log) => {
+    if (statusFilter !== 'All' && log.status !== statusFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      log.description.toLowerCase().includes(q) ||
+      log.vehicle?.registration_number?.toLowerCase().includes(q) ||
+      log.vehicle?.model?.toLowerCase().includes(q)
+    );
+  });
+
+  const openCount = logs.filter((l) => l.status === 'Open').length;
+  const closedCount = logs.filter((l) => l.status === 'Closed').length;
+  const totalCost = logs.reduce((s, l) => s + (l.cost || 0), 0);
+  const openCost = logs.filter((l) => l.status === 'Open').reduce((s, l) => s + (l.cost || 0), 0);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Maintenance Records</h2>
-          <p className="text-xs text-slate-400">Trigger vehicle status transitions and log fleet service events</p>
+          <h2 className="text-xl font-bold tracking-tight">Maintenance</h2>
+          <p className="text-sm text-muted-foreground">
+            Shop check-ins, service logs, and vehicle status transitions
+          </p>
         </div>
-
         {canAccess('maintenance', 'create') && (
-          <button
-            onClick={() => setIsOpen(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/10 cursor-pointer"
-          >
-            <Plus className="h-4 w-4" /> Log Service
-          </button>
+          <Button onClick={() => setIsOpen(true)} className="gap-2 shrink-0">
+            <Plus className="h-4 w-4" /> Log service
+          </Button>
         )}
       </div>
 
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      ) : logs.length === 0 ? (
-        <div className="bg-[#0F1424]/40 border border-slate-850 p-12 text-center rounded-2xl">
-          <Wrench className="h-10 w-10 text-slate-600 mx-auto mb-2" />
-          <p className="text-xs text-slate-400 font-semibold">No maintenance logs found in registry.</p>
-        </div>
-      ) : (
-        <div className="bg-[#0F1424]/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-900/50 border-b border-slate-850 text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="p-4">Vehicle</th>
-                  <th className="p-4">Service Description</th>
-                  <th className="p-4">Total Cost</th>
-                  <th className="p-4">Opened Date</th>
-                  <th className="p-4">Closed Date</th>
-                  <th className="p-4">State</th>
-                  {canAccess('maintenance', 'create') && <th className="p-4 text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-850">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="p-4 font-bold text-slate-200">
-                      {log.vehicle ? log.vehicle.registration_number : 'Unknown'}
-                      <span className="block text-[10px] text-slate-500 font-medium font-sans">
-                        {log.vehicle ? log.vehicle.model : ''}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-300 max-w-xs">{log.description}</td>
-                    <td className="p-4 text-slate-300 font-semibold font-mono">
-                      ₹{log.cost.toLocaleString()}
-                    </td>
-                    <td className="p-4 text-slate-400">
-                      {new Date(log.opened_at).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 text-slate-400">
-                      {log.closed_at ? new Date(log.closed_at).toLocaleDateString() : '--'}
-                    </td>
-                    <td className="p-4">{getStatusBadge(log.status)}</td>
-                    {canAccess('maintenance', 'create') && (
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {log.status === 'Open' && (
-                            <button
-                              onClick={() => openCloseModal(log)}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <CheckCircle className="h-3.5 w-3.5" /> Close Log
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteLog(log.id)}
-                            title="Delete Log"
-                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Open jobs</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{openCount}</div>
+            <p className="text-[10px] text-muted-foreground">Units currently In Shop</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Closed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{closedCount}</div>
+            <p className="text-[10px] text-muted-foreground">Completed services</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Open estimate</CardTitle>
+            <DollarSign className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${openCost.toLocaleString()}</div>
+            <p className="text-[10px] text-muted-foreground">Pending close-out</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Total spend</CardTitle>
+            <Wrench className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalCost.toLocaleString()}</div>
+            <p className="text-[10px] text-muted-foreground">All logged repairs</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search vehicle or description…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as 'All' | 'Open' | 'Closed')}
+            >
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All statuses</SelectItem>
+                <SelectItem value="Open">Open / In Shop</SelectItem>
+                <SelectItem value="Closed">Closed / Serviced</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
         </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Wrench className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm font-medium">No maintenance logs found</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Adjust filters or log a new shop check-in
+            </p>
+            {canAccess('maintenance', 'create') && (
+              <Button className="mt-4" size="sm" onClick={() => setIsOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Log service
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Cost</TableHead>
+                  <TableHead>Opened</TableHead>
+                  <TableHead>Closed</TableHead>
+                  <TableHead>Status</TableHead>
+                  {(canAccess('maintenance', 'update') || canAccess('maintenance', 'delete')) && (
+                    <TableHead className="text-right">Actions</TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell>
+                      <div className="font-semibold">
+                        {log.vehicle?.registration_number || 'Unknown'}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {log.vehicle?.model || ''}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      <span className="line-clamp-2 text-muted-foreground">{log.description}</span>
+                    </TableCell>
+                    <TableCell className="font-mono font-medium">
+                      ${log.cost.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {new Date(log.opened_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {log.closed_at ? new Date(log.closed_at).toLocaleDateString() : '—'}
+                    </TableCell>
+                    <TableCell>
+                      {log.status === 'Open' ? (
+                        <Badge variant="destructive" className="gap-1">
+                          <Clock className="h-3 w-3" /> In Shop
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        >
+                          <CheckCircle className="h-3 w-3" /> Serviced
+                        </Badge>
+                      )}
+                    </TableCell>
+                    {(canAccess('maintenance', 'update') || canAccess('maintenance', 'delete')) && (
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {log.status === 'Open' && canAccess('maintenance', 'update') && (
+                            <Button size="sm" variant="outline" onClick={() => openCloseModal(log)}>
+                              Close log
+                            </Button>
+                          )}
+                          {canAccess('maintenance', 'delete') && (
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteLog(log.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       )}
 
-      {/* Open Log Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <div>
-                <h3 className="font-extrabold text-slate-200 text-sm">Log Shop Check-in</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Locks vehicle status to In Shop on database</p>
+      {/* Open log dialog */}
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Log shop check-in</DialogTitle>
+            <DialogDescription>
+              Opens a maintenance ticket and sets the vehicle to In Shop
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleOpenMaintenance} className="space-y-4">
+            {errorMsg && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleOpenMaintenance} className="p-6 space-y-4">
-              {errorMsg && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Select Vehicle</label>
-                <select
-                  required
-                  value={selectedVehicleId}
-                  onChange={(e) => setSelectedVehicleId(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="">-- Choose Vehicle --</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.registration_number} - {v.model} (Odo: {v.odometer}km, Status: {v.status})
-                    </option>
+            )}
+            <div className="space-y-2">
+              <Label>Vehicle</Label>
+              <Select value={selectedVehicleId} onValueChange={(v) => v && setSelectedVehicleId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.registration_number} — {v.model} ({v.status})
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Repair/Service Description</label>
-                <textarea
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <textarea
+                required
+                placeholder="Diagnostics, parts, symptoms…"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Estimated cost ($)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="number"
                   required
-                  placeholder="Describe parts checked, diagnostics, or vibration repairs..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none resize-none"
+                  min={0}
+                  placeholder="350"
+                  value={estimatedCost}
+                  onChange={(e) => setEstimatedCost(e.target.value)}
+                  className="pl-9"
                 />
               </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estimated Cost (₹)</label>
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 350"
-                    value={estimatedCost}
-                    onChange={(e) => setEstimatedCost(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
-                >
-                  Open Log
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Close Log Modal */}
-      {closeOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <div>
-                <h3 className="font-extrabold text-slate-200 text-sm">Close Service Log</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Releases vehicle and registers cost expense</p>
-              </div>
-              <button
-                onClick={() => setCloseOpen(false)}
-                className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Open log'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-            <form onSubmit={handleCloseMaintenance} className="p-6 space-y-4">
-              {closeError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{closeError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Final Service Cost (₹)</label>
-                <div className="relative">
-                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 450"
-                    value={finalCost}
-                    onChange={(e) => setFinalCost(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-200 focus:outline-none font-bold"
-                  />
-                </div>
+      {/* Close log dialog */}
+      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Close service log</DialogTitle>
+            <DialogDescription>
+              Releases the vehicle and posts the repair cost to expenses
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCloseMaintenance} className="space-y-4">
+            {closeError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{closeError}</span>
               </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setCloseOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
-                >
-                  Complete Service
-                </button>
+            )}
+            <div className="space-y-2">
+              <Label>Final service cost ($)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  value={finalCost}
+                  onChange={(e) => setFinalCost(e.target.value)}
+                  className="pl-9 font-semibold"
+                />
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setCloseOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Closing…' : 'Complete service'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

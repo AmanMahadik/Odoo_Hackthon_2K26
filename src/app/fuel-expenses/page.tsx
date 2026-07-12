@@ -3,28 +3,56 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
-import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, FuelLog, Expense } from '@/lib/mockData';
-import { 
-  Plus, 
-  DollarSign, 
-  Fuel, 
+import {
+  Plus,
+  DollarSign,
+  Fuel,
   Receipt,
-  FileText,
   AlertTriangle,
-  X,
-  Trash2
+  Search,
+  TrendingUp,
+  Trash2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 
 export default function FuelExpensesPage() {
   const { canAccess } = useRole();
-  const [activeTab, setActiveTab] = useState<'fuel' | 'expenses'>('fuel');
+  const canCreate = canAccess('expenses', 'create') || canAccess('fuel', 'create');
+
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
-  // Fuel Form Modal
   const [fuelOpen, setFuelOpen] = useState(false);
   const [fuelVehicleId, setFuelVehicleId] = useState('');
   const [fuelLiters, setFuelLiters] = useState('');
@@ -32,7 +60,6 @@ export default function FuelExpensesPage() {
   const [fuelDate, setFuelDate] = useState('');
   const [fuelError, setFuelError] = useState('');
 
-  // Expense Form Modal
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expenseVehicleId, setExpenseVehicleId] = useState('');
   const [expenseType, setExpenseType] = useState<'toll' | 'repair' | 'misc'>('toll');
@@ -40,6 +67,7 @@ export default function FuelExpensesPage() {
   const [expenseDate, setExpenseDate] = useState('');
   const [expenseDesc, setExpenseDesc] = useState('');
   const [expenseError, setExpenseError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -47,11 +75,11 @@ export default function FuelExpensesPage() {
       const [fLogs, expList, vList] = await Promise.all([
         db.getFuelLogs(),
         db.getExpenses(),
-        db.getVehicles()
+        db.getVehicles(),
       ]);
       setFuelLogs(fLogs);
       setExpenses(expList);
-      setVehicles(vList.filter(v => v.status !== 'Retired'));
+      setVehicles(vList.filter((v) => v.status !== 'Retired'));
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,65 +89,62 @@ export default function FuelExpensesPage() {
 
   useEffect(() => {
     fetchData();
+    setFuelDate(new Date().toISOString().split('T')[0]);
+    setExpenseDate(new Date().toISOString().split('T')[0]);
   }, []);
-
-  useRealtimeSync('fuel_logs', fetchData);
-  useRealtimeSync('expenses', fetchData);
 
   const handleCreateFuelLog = async (e: React.FormEvent) => {
     e.preventDefault();
     setFuelError('');
-
     if (!fuelVehicleId || !fuelLiters || !fuelCost || !fuelDate) {
       setFuelError('Please complete all required fields.');
       return;
     }
-
+    setSubmitting(true);
     try {
       await db.createFuelLog({
         vehicle_id: fuelVehicleId,
         liters: Number(fuelLiters),
         cost: Number(fuelCost),
-        log_date: fuelDate
+        log_date: fuelDate,
       });
-
       setFuelVehicleId('');
       setFuelLiters('');
       setFuelCost('');
-      setFuelDate('');
       setFuelOpen(false);
       fetchData();
     } catch (err: any) {
       setFuelError(err.message || 'Error saving fuel log.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     setExpenseError('');
-
     if (!expenseVehicleId || !expenseAmount || !expenseDate || !expenseDesc) {
       setExpenseError('Please complete all required fields.');
       return;
     }
-
+    setSubmitting(true);
     try {
       await db.createExpense({
         vehicle_id: expenseVehicleId,
         type: expenseType,
         amount: Number(expenseAmount),
         expense_date: expenseDate,
-        description: expenseDesc.trim()
+        description: expenseDesc.trim(),
       });
-
       setExpenseVehicleId('');
       setExpenseAmount('');
-      setExpenseDate('');
       setExpenseDesc('');
       setExpenseOpen(false);
       fetchData();
     } catch (err: any) {
       setExpenseError(err.message || 'Error saving expense log.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -143,393 +168,428 @@ export default function FuelExpensesPage() {
     }
   };
 
-  // Calculate totals
-  const totalFuelCost = fuelLogs.reduce((sum, log) => sum + log.cost, 0);
+    const totalFuelCost = fuelLogs.reduce((sum, log) => sum + log.cost, 0);
+  const totalFuelLiters = fuelLogs.reduce((sum, log) => sum + log.liters, 0);
   const totalExpenseCost = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const avgFuelRate = totalFuelLiters > 0 ? totalFuelCost / totalFuelLiters : 0;
+  const grandTotal = totalFuelCost + totalExpenseCost;
+
+  const q = search.toLowerCase();
+  const filteredFuel = fuelLogs.filter((log) => {
+    if (!q) return true;
+    return (
+      log.vehicle?.registration_number?.toLowerCase().includes(q) ||
+      log.log_date.includes(q)
+    );
+  });
+  const filteredExpenses = expenses.filter((exp) => {
+    if (!q) return true;
+    return (
+      exp.vehicle?.registration_number?.toLowerCase().includes(q) ||
+      exp.type.includes(q) ||
+      exp.description?.toLowerCase().includes(q) ||
+      exp.expense_date.includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Fuel & Expenses Ledger</h2>
-          <p className="text-xs text-slate-400">Track fuel consumption, toll fees, and maintenance costs per vehicle</p>
+          <h2 className="text-xl font-bold tracking-tight">Fuel & Expenses</h2>
+          <p className="text-sm text-muted-foreground">
+            Track consumption, tolls, repairs, and operating cost per vehicle
+          </p>
         </div>
+        {canCreate && (
+          <div className="flex gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setFuelOpen(true)} className="gap-1.5">
+              <Fuel className="h-4 w-4" /> Log fuel
+            </Button>
+            <Button onClick={() => setExpenseOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Log expense
+            </Button>
+          </div>
+        )}
+      </div>
 
-        <div className="flex gap-2">
-          {canAccess('expenses', 'create') && (
-            <>
-              <button
-                onClick={() => setFuelOpen(true)}
-                className="px-3 py-2 bg-[#171d33] border border-slate-700/80 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Fuel className="h-4 w-4 text-blue-400" /> Log Fuel
-              </button>
-              <button
-                onClick={() => setExpenseOpen(true)}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-blue-500/10 cursor-pointer"
-              >
-                <Plus className="h-4 w-4" /> Log Expense
-              </button>
-            </>
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Fuel spend</CardTitle>
+            <Fuel className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[10px] text-muted-foreground">{fuelLogs.length} fill-ups logged</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Other expenses</CardTitle>
+            <Receipt className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[10px] text-muted-foreground">Tolls, repairs, misc</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Avg $/L</CardTitle>
+            <TrendingUp className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${avgFuelRate.toFixed(2)}</div>
+            <p className="text-[10px] text-muted-foreground">{totalFuelLiters.toFixed(0)} L total</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Combined cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[10px] text-muted-foreground">Fuel + general expenses</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Search + tabs */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search vehicle, type, date…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      <Tabs defaultValue="fuel" className="w-full">
+        <TabsList>
+          <TabsTrigger value="fuel">Fuel logs ({filteredFuel.length})</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses ({filteredExpenses.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="fuel" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+            </div>
+          ) : filteredFuel.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Fuel className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium">No fuel logs found</p>
+                {canCreate && (
+                  <Button className="mt-4" size="sm" onClick={() => setFuelOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" /> Log fuel
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Liters</TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead>Rate</TableHead>
+                      <TableHead>Source</TableHead>
+                      {canAccess('expenses', 'create') && <TableHead className="text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFuel.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="font-semibold">
+                          {log.vehicle?.registration_number || 'Unknown'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{log.log_date}</TableCell>
+                        <TableCell className="font-mono">{log.liters} L</TableCell>
+                        <TableCell className="font-mono font-medium">${log.cost.toFixed(2)}</TableCell>
+                        <TableCell className="font-mono text-muted-foreground">
+                          ${(log.cost / Math.max(log.liters, 0.01)).toFixed(2)}/L
+                        </TableCell>
+                        <TableCell>
+                          {log.trip_id ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              Trip linked
+                            </Badge>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">Manual</span>
+                          )}
+                        </TableCell>
+                        {canAccess('expenses', 'create') && (
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteFuelLog(log.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
           )}
-        </div>
-      </div>
+        </TabsContent>
 
-      {/* Summary Rollups */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Cumulative Fuel Expenses</span>
-            <span className="text-2xl font-black text-white">₹{totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            <p className="text-[10px] text-slate-500">From {fuelLogs.length} logs recorded</p>
-          </div>
-          <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400">
-            <Fuel className="h-6 w-6" />
-          </div>
-        </div>
-
-        <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Cumulative General Expenses</span>
-            <span className="text-2xl font-black text-white">₹{totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            <p className="text-[10px] text-slate-500">Tolls, service charges, repairs</p>
-          </div>
-          <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
-            <Receipt className="h-6 w-6" />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-slate-800 flex gap-4 text-xs font-bold">
-        <button
-          onClick={() => setActiveTab('fuel')}
-          className={`pb-3 transition-colors ${activeTab === 'fuel' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-        >
-          Fuel Logs ({fuelLogs.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('expenses')}
-          className={`pb-3 transition-colors ${activeTab === 'expenses' ? 'border-b-2 border-blue-500 text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-        >
-          Expenses ({expenses.length})
-        </button>
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      ) : activeTab === 'fuel' ? (
-        fuelLogs.length === 0 ? (
-          <div className="bg-[#0F1424]/40 border border-slate-850 p-12 text-center rounded-2xl">
-            <Fuel className="h-10 w-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-xs text-slate-400 font-semibold">No fuel logs found.</p>
-          </div>
-        ) : (
-          <div className="bg-[#0F1424]/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-200">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-900/50 border-b border-slate-850 text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="p-4">Vehicle</th>
-                  <th className="p-4">Log Date</th>
-                  <th className="p-4">Liters Consumed</th>
-                  <th className="p-4">Total Cost</th>
-                  <th className="p-4">Avg Rate</th>
-                  <th className="p-4">Source Link</th>
-                  {canAccess('expenses', 'create') && <th className="p-4 text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-850">
-                {fuelLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="p-4 font-bold text-slate-200">
-                      {log.vehicle ? log.vehicle.registration_number : 'Unknown'}
-                    </td>
-                    <td className="p-4 text-slate-400">{log.log_date}</td>
-                    <td className="p-4 text-slate-300 font-semibold font-mono">{log.liters} L</td>
-                    <td className="p-4 text-slate-300 font-bold font-mono">₹{log.cost}</td>
-                    <td className="p-4 text-slate-400 font-mono">₹{(log.cost / log.liters).toFixed(2)}/L</td>
-                    <td className="p-4">
-                      {log.trip_id ? (
-                        <span className="text-[10px] text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 rounded-full">
-                          Trip Link
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-500 italic">Manual Log</span>
-                      )}
-                    </td>
-                    {canAccess('expenses', 'create') && (
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleDeleteFuelLog(log.id)}
-                          title="Delete Fuel Log"
-                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      ) : (
-        expenses.length === 0 ? (
-          <div className="bg-[#0F1424]/40 border border-slate-850 p-12 text-center rounded-2xl">
-            <Receipt className="h-10 w-10 text-slate-600 mx-auto mb-2" />
-            <p className="text-xs text-slate-400 font-semibold">No expenses recorded.</p>
-          </div>
-        ) : (
-          <div className="bg-[#0F1424]/90 border border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in duration-200">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-900/50 border-b border-slate-850 text-slate-400 font-bold uppercase tracking-wider">
-                  <th className="p-4">Vehicle</th>
-                  <th className="p-4">Expense Date</th>
-                  <th className="p-4">Type</th>
-                  <th className="p-4">Description</th>
-                  <th className="p-4">Amount</th>
-                  {canAccess('expenses', 'create') && <th className="p-4 text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-850">
-                {expenses.map((exp) => (
-                  <tr key={exp.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="p-4 font-bold text-slate-200">
-                      {exp.vehicle ? exp.vehicle.registration_number : 'Unknown'}
-                    </td>
-                    <td className="p-4 text-slate-400">{exp.expense_date}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] uppercase font-bold ${
-                        exp.type === 'toll' ? 'bg-blue-500/10 text-blue-400' :
-                        exp.type === 'repair' ? 'bg-red-500/10 text-red-400' :
-                        'bg-slate-800 text-slate-400'
-                      }`}>
-                        {exp.type}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-300">{exp.description || 'General fee charge'}</td>
-                    <td className="p-4 text-slate-300 font-bold font-mono">₹{exp.amount}</td>
-                    {canAccess('expenses', 'create') && (
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleDeleteExpense(exp.id)}
-                          title="Delete Expense"
-                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-
-      {/* Fuel Log Modal */}
-      {fuelOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <h3 className="font-extrabold text-slate-200 text-sm">Log Fuel Entry</h3>
-              <button onClick={() => setFuelOpen(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
+        <TabsContent value="expenses" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
             </div>
+          ) : filteredExpenses.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium">No expenses recorded</p>
+                {canCreate && (
+                  <Button className="mt-4" size="sm" onClick={() => setExpenseOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" /> Log expense
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Amount</TableHead>
+                      {canAccess('expenses', 'create') && <TableHead className="text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses.map((exp) => (
+                      <TableRow key={exp.id}>
+                        <TableCell className="font-semibold">
+                          {exp.vehicle?.registration_number || 'Unknown'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{exp.expense_date}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              exp.type === 'toll'
+                                ? 'border-blue-500/30 text-blue-600 dark:text-blue-400'
+                                : exp.type === 'repair'
+                                  ? 'border-red-500/30 text-red-600 dark:text-red-400'
+                                  : ''
+                            }
+                          >
+                            {exp.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate">
+                          {exp.description || 'General fee'}
+                        </TableCell>
+                        <TableCell className="font-mono font-medium">
+                          ${exp.amount.toFixed(2)}
+                        </TableCell>
+                        {canAccess('expenses', 'create') && (
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteExpense(exp.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
 
-            <form onSubmit={handleCreateFuelLog} className="p-6 space-y-4">
-              {fuelError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{fuelError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Vehicle</label>
-                <select
-                  required
-                  value={fuelVehicleId}
-                  onChange={(e) => setFuelVehicleId(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="">-- Select Vehicle --</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.registration_number} - {v.model}</option>
+      {/* Fuel dialog */}
+      <Dialog open={fuelOpen} onOpenChange={setFuelOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log fuel entry</DialogTitle>
+            <DialogDescription>Record a fill-up against a fleet vehicle</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateFuelLog} className="space-y-4">
+            {fuelError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {fuelError}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Vehicle</Label>
+              <Select value={fuelVehicleId} onValueChange={(v) => v && setFuelVehicleId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.registration_number} — {v.model}
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Liters</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 50"
-                    value={fuelLiters}
-                    onChange={(e) => setFuelLiters(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Total Cost (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="e.g. 110"
-                    value={fuelCost}
-                    onChange={(e) => setFuelCost(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Purchase Date</label>
-                <input
-                  type="date"
-                  required
-                  value={fuelDate}
-                  onChange={(e) => setFuelDate(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setFuelOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
-                >
-                  Save Entry
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Expense Modal */}
-      {expenseOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <h3 className="font-extrabold text-slate-200 text-sm">Log Fleet Expense</h3>
-              <button onClick={() => setExpenseOpen(false)} className="text-slate-500 hover:text-slate-300 cursor-pointer">
-                <X className="h-5 w-5" />
-              </button>
+                </SelectContent>
+              </Select>
             </div>
-
-            <form onSubmit={handleCreateExpense} className="p-6 space-y-4">
-              {expenseError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{expenseError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Vehicle</label>
-                <select
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Liters</Label>
+                <Input
+                  type="number"
                   required
-                  value={expenseVehicleId}
-                  onChange={(e) => setExpenseVehicleId(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="">-- Select Vehicle --</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.registration_number} - {v.model}</option>
+                  min={0}
+                  step="0.1"
+                  placeholder="50"
+                  value={fuelLiters}
+                  onChange={(e) => setFuelLiters(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Cost ($)</Label>
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  step="0.01"
+                  placeholder="110"
+                  value={fuelCost}
+                  onChange={(e) => setFuelCost(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Purchase date</Label>
+              <Input
+                type="date"
+                required
+                value={fuelDate}
+                onChange={(e) => setFuelDate(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setFuelOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Save entry'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Expense dialog */}
+      <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log fleet expense</DialogTitle>
+            <DialogDescription>Toll, repair, or miscellaneous operating cost</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateExpense} className="space-y-4">
+            {expenseError && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {expenseError}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Vehicle</Label>
+              <Select value={expenseVehicleId} onValueChange={(v) => v && setExpenseVehicleId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.registration_number} — {v.model}
+                    </SelectItem>
                   ))}
-                </select>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select
+                  value={expenseType}
+                  onValueChange={(v) => setExpenseType(v as 'toll' | 'repair' | 'misc')}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="toll">Toll</SelectItem>
+                    <SelectItem value="repair">Repair</SelectItem>
+                    <SelectItem value="misc">Miscellaneous</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Expense Type</label>
-                  <select
-                    value={expenseType}
-                    onChange={(e) => setExpenseType(e.target.value as any)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  >
-                    <option value="toll">Toll</option>
-                    <option value="repair">Repair</option>
-                    <option value="misc">Miscellaneous</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Amount (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="e.g. 15.50"
-                    value={expenseAmount}
-                    onChange={(e) => setExpenseAmount(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Description</label>
-                <input
-                  type="text"
+              <div className="space-y-2">
+                <Label>Amount ($)</Label>
+                <Input
+                  type="number"
                   required
-                  placeholder="e.g. Toll bridge fee or parking charge"
-                  value={expenseDesc}
-                  onChange={(e) => setExpenseDesc(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                  min={0}
+                  step="0.01"
+                  placeholder="15.50"
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
                 />
               </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Charge Date</label>
-                <input
-                  type="date"
-                  required
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setExpenseOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
-                >
-                  Save Expense
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                type="text"
+                required
+                placeholder="Toll bridge fee or parking"
+                value={expenseDesc}
+                onChange={(e) => setExpenseDesc(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Charge date</Label>
+              <Input
+                type="date"
+                required
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setExpenseOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Save expense'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

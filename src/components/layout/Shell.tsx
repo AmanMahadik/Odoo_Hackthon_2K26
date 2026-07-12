@@ -61,12 +61,14 @@ export default function Shell({ children }: ShellProps) {
         <div className="container mx-auto px-4 md:px-8">
           <div className="flex h-16 items-center justify-between relative">
             {/* Logo / Brand (Left) */}
-            <div className="flex items-center gap-2 flex-1">
-              <span className="font-semibold text-lg tracking-tight">TransitOps</span>
-              <Badge variant="secondary" className="ml-1 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex">
+            <Link href="/" className="flex items-center gap-2.5 flex-1 min-w-0">
+              <img src="/icon/light.png" alt="TransitOps" className="h-10 w-auto dark:hidden shrink-0" />
+              <img src="/icon/dark.png" alt="TransitOps" className="h-10 w-auto hidden dark:block shrink-0" />
+              <span className="font-bold text-xl tracking-tight">TransitOps</span>
+              <Badge variant="secondary" className="ml-1 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0">
                 {role}
               </Badge>
-            </div>
+            </Link>
 
             {/* Desktop Tabs Navigation (Center Pill) */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center justify-center">
