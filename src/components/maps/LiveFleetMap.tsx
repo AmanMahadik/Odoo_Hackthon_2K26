@@ -25,6 +25,9 @@ interface LiveFleetMapProps {
   selectedVehicleId?: string | null;
   showRoutes?: boolean;
   onSelectVehicle?: (id: string | null) => void;
+  /** Fill parent height instead of fixed sizes */
+  fill?: boolean;
+  className?: string;
 }
 
 const ROUTE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444'];
@@ -68,6 +71,8 @@ export default function LiveFleetMap({
   selectedVehicleId = null,
   showRoutes = true,
   onSelectVehicle,
+  fill = false,
+  className = '',
 }: LiveFleetMapProps) {
   const [positions, setPositions] = useState<
     Record<
@@ -112,9 +117,15 @@ export default function LiveFleetMap({
   const selectedPos = selectedVehicleId ? positions[selectedVehicleId] : null;
   const onTripCount = Object.values(positions).filter((p) => (p.speed || 0) > 0).length;
 
+  const heightClass = fill
+    ? 'h-full min-h-0'
+    : compact
+      ? 'h-full min-h-[360px]'
+      : 'h-[calc(100vh-140px)]';
+
   return (
     <div
-      className={`relative ${compact ? 'h-[420px]' : 'h-[calc(100vh-140px)]'} w-full rounded-xl overflow-hidden border border-border shadow-lg`}
+      className={`relative ${heightClass} w-full overflow-hidden border border-border ${className}`}
     >
       {/* Live indicator */}
       <div className="absolute top-3 right-3 z-[400] bg-background/90 backdrop-blur border border-border px-2.5 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">

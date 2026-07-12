@@ -14,7 +14,7 @@ import {
   mockDrivers,
 } from '@/lib/mockData';
 import { gpsService, economicService } from '@/lib/mockServices';
-import type { FuelPriceData } from '@/lib/mockData';
+import type { FuelPriceData, FuelForecast } from '@/lib/mockData';
 import {
   TrendingUp,
   Truck,
@@ -36,12 +36,14 @@ import {
   X,
   TrendingDown,
   Minus,
+  Brain,
+  Maximize2,
 } from 'lucide-react';
 import AIPredictionCard from '@/components/ai/AIPredictionCard';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Cell } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Cell, AreaChart, Area } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Progress, ProgressTrack, ProgressIndicator } from '@/components/ui/progress';
 import {
@@ -170,9 +172,16 @@ export default function Dashboard() {
   >([]);
   const [insightCards, setInsightCards] = useState<FeedItem[]>([]);
   const [fuelIndex, setFuelIndex] = useState<FuelPriceData | null>(null);
+  const [fuelForecast, setFuelForecast] = useState<FuelForecast[]>([]);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
 
   useEffect(() => {
-    economicService.getFuelPrice().then(setFuelIndex).catch(console.error);
+    Promise.all([economicService.getFuelPrice(), economicService.getFuelForecast()])
+      .then(([price, forecast]) => {
+        setFuelIndex(price);
+        setFuelForecast(forecast);
+      })
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -474,14 +483,15 @@ export default function Dashboard() {
 
   const highRiskDrivers = mockDrivers.filter((d) => d.safety_score < 75);
   const excellentDrivers = mockDrivers.filter((d) => d.safety_score >= 90);
+  // Explicit hex so bars stay visible in dark mode (CSS vars can wash out)
   const scoreDistribution = [
-    { name: '90-100 Excellent', count: excellentDrivers.length, fill: 'hsl(var(--primary))' },
+    { name: '90-100 Excellent', count: excellentDrivers.length, fill: '#34d399' },
     {
       name: '75-89 Average',
       count: mockDrivers.length - highRiskDrivers.length - excellentDrivers.length,
-      fill: 'hsl(var(--muted-foreground))',
+      fill: '#e5e5e5',
     },
-    { name: '<75 High Risk', count: highRiskDrivers.length, fill: 'hsl(var(--destructive))' },
+    { name: '<75 High Risk', count: highRiskDrivers.length, fill: '#f87171' },
   ];
 
   const expiringLicenses = drivers.filter((d) => {
@@ -489,94 +499,6 @@ export default function Dashboard() {
     const diffDays = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays <= 30;
   });
-
-  const segmentCards = [
-    {
-      title: 'Active Vehicles',
-      value: onTripVehicles.length,
-      subtitle: 'Currently On Trip',
-      icon: Radio,
-      href: '/vehicles',
-      accent: 'text-emerald-500 bg-emerald-500/10',
-      roles: [
-        'Fleet Manager',
-        'Driver',
-        'Dispatcher',
-        'Safety Officer',
-        'Financial Analyst',
-        'Maintenance Technician',
-      ] as const,
-    },
-    {
-      title: 'Available',
-      value: availableVehicles.length,
-      subtitle: 'Ready for dispatch',
-      icon: Truck,
-      href: '/vehicles',
-      accent: 'text-sky-500 bg-sky-500/10',
-      roles: [
-        'Fleet Manager',
-        'Driver',
-        'Dispatcher',
-        'Safety Officer',
-        'Maintenance Technician',
-      ] as const,
-    },
-    {
-      title: 'In Shop',
-      value: inShopVehicles.length,
-      subtitle: `${openMaintenance.length} open logs`,
-      icon: Wrench,
-      href: '/maintenance',
-      accent: 'text-orange-500 bg-orange-500/10',
-      roles: ['Fleet Manager', 'Driver', 'Safety Officer', 'Maintenance Technician'] as const,
-    },
-    {
-      title: 'Live Trips',
-      value: activeTrips.length,
-      subtitle: 'Dispatched now',
-      icon: Navigation,
-      href: '/trips',
-      accent: 'text-blue-500 bg-blue-500/10',
-      roles: ['Fleet Manager', 'Driver', 'Dispatcher'] as const,
-    },
-    {
-      title: 'Pending',
-      value: draftTrips.length,
-      subtitle: 'Draft routes',
-      icon: Clock,
-      href: '/trips',
-      accent: 'text-amber-500 bg-amber-500/10',
-      roles: ['Fleet Manager', 'Driver', 'Dispatcher'] as const,
-    },
-    {
-      title: 'On Duty',
-      value: activeDrivers.length,
-      subtitle: `${drivers.length} roster`,
-      icon: Users,
-      href: '/drivers',
-      accent: 'text-indigo-500 bg-indigo-500/10',
-      roles: ['Fleet Manager', 'Driver', 'Dispatcher', 'Safety Officer'] as const,
-    },
-    {
-      title: 'Utilization',
-      value: `${utilizationRate}%`,
-      subtitle: 'Active fleet load',
-      icon: TrendingUp,
-      href: '/reports',
-      accent: 'text-purple-500 bg-purple-500/10',
-      roles: ['Fleet Manager', 'Financial Analyst'] as const,
-    },
-    {
-      title: 'Fuel Desk',
-      value: 'Open',
-      subtitle: 'Logs & expenses',
-      icon: Fuel,
-      href: '/fuel-expenses',
-      accent: 'text-teal-500 bg-teal-500/10',
-      roles: ['Fleet Manager', 'Driver', 'Financial Analyst'] as const,
-    },
-  ].filter((c) => (c.roles as readonly string[]).includes(role));
 
   const vehicleIds = liveList.map((x) => x.id);
   const tripIds = tripCards.slice(0, 5).map((x) => x.id);
@@ -607,266 +529,293 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-500">
-      {/* Header actions only — no role title line */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Badge variant="outline" className="gap-1.5">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-          </span>
-          Live
-        </Badge>
-
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={openFilterModal}>
-          <Filter className="h-3.5 w-3.5" />
-          Filters
+    <div className="space-y-2 animate-in fade-in duration-300">
+      {/* Dashboard title + filters on one horizontal row */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <h1 className="text-lg tracking-tight text-foreground font-normal pl-0.5 sm:pl-1">
+            Dashboard
+          </h1>
           {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px]">
-              {activeFilterCount}
-            </Badge>
+            <>
+              {typeFilter !== 'All' && (
+                <Badge variant="secondary" className="gap-1 font-normal">
+                  Type: {typeFilter}
+                  <button type="button" onClick={() => setTypeFilter('All')} className="ml-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {statusFilter !== 'All' && (
+                <Badge variant="secondary" className="gap-1 font-normal">
+                  Status: {statusFilter}
+                  <button type="button" onClick={() => setStatusFilter('All')} className="ml-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {regionFilter !== 'All' && (
+                <Badge variant="secondary" className="gap-1 font-normal">
+                  Region: {regionFilter}
+                  <button type="button" onClick={() => setRegionFilter('All')} className="ml-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+            </>
           )}
-        </Button>
-
-        {canAccess('trips', 'create') && (
-          <Link href="/trips?new=true" className={buttonVariants({ size: 'sm' })}>
-            Dispatch route
-          </Link>
-        )}
-      </div>
-
-      {/* Active filter chips */}
-      {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {typeFilter !== 'All' && (
-            <Badge variant="secondary" className="gap-1">
-              Type: {typeFilter}
-              <button type="button" onClick={() => setTypeFilter('All')} className="ml-0.5">
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {statusFilter !== 'All' && (
-            <Badge variant="secondary" className="gap-1">
-              Status: {statusFilter}
-              <button type="button" onClick={() => setStatusFilter('All')} className="ml-0.5">
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {regionFilter !== 'All' && (
-            <Badge variant="secondary" className="gap-1">
-              Region: {regionFilter}
-              <button type="button" onClick={() => setRegionFilter('All')} className="ml-0.5">
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          <span className="text-[11px] text-muted-foreground">{scoped.length} vehicles in scope</span>
         </div>
-      )}
-
-      {/* Live KPI marquee + global fuel index */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-        <div className="lg:col-span-9 relative overflow-hidden rounded-xl border border-border bg-card">
-          <div className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-card to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-l from-card to-transparent pointer-events-none" />
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="gap-1.5 font-normal">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Live ops strip
-            </span>
-          </div>
-          <div className="overflow-hidden py-2.5">
-            <div className="transitops-marquee-track gap-3 px-3">
-              {[...segmentCards, ...segmentCards].map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <Link
-                    key={`${card.title}-${i}`}
-                    href={card.href}
-                    className="shrink-0 w-[160px] rounded-lg border border-border bg-background/80 px-3 py-2.5 hover:border-primary/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-medium text-muted-foreground truncate">
-                        {card.title}
-                      </span>
-                      <div className={`p-1 rounded-md ${card.accent}`}>
-                        <Icon className="h-3 w-3" />
-                      </div>
-                    </div>
-                    <div className="text-xl font-bold tracking-tight">{card.value}</div>
-                    <p className="text-[9px] text-muted-foreground truncate">{card.subtitle}</p>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        <Card className="lg:col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Fuel className="h-4 w-4 text-amber-500" /> Global fuel index
-            </CardTitle>
-            <CardDescription className="text-[11px]">Market diesel / petrol pulse</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {fuelIndex ? (
-              <>
-                <div className="flex items-end justify-between gap-2">
-                  <div>
-                    <div className="text-2xl font-bold tracking-tight">
-                      ${fuelIndex.price.toFixed(2)}
-                      <span className="text-xs font-medium text-muted-foreground ml-1">
-                        /L {fuelIndex.currency}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Spot index · live feed</p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={
-                      fuelIndex.trend === 'rising'
-                        ? 'text-red-500 border-red-500/30'
-                        : fuelIndex.trend === 'falling'
-                          ? 'text-emerald-500 border-emerald-500/30'
-                          : ''
-                    }
-                  >
-                    {fuelIndex.trend === 'rising' && <TrendingUp className="h-3 w-3 mr-1" />}
-                    {fuelIndex.trend === 'falling' && <TrendingDown className="h-3 w-3 mr-1" />}
-                    {fuelIndex.trend === 'stable' && <Minus className="h-3 w-3 mr-1" />}
-                    {fuelIndex.changePercent > 0 ? '+' : ''}
-                    {fuelIndex.changePercent}%
-                  </Badge>
-                </div>
-                <Link
-                  href="/fuel-expenses"
-                  className={`${buttonVariants({ variant: 'outline', size: 'sm' })} w-full`}
-                >
-                  Open fuel desk
-                </Link>
-              </>
-            ) : (
-              <div className="h-16 animate-pulse rounded-md bg-muted" />
+            Live
+          </Badge>
+          <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={openFilterModal}>
+            <Filter className="h-3.5 w-3.5" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-0.5 h-5 min-w-5 px-1.5 text-[10px] font-normal">
+                {activeFilterCount}
+              </Badge>
             )}
-          </CardContent>
-        </Card>
+          </Button>
+          {canAccess('trips', 'create') && (
+            <Link href="/trips?new=true" className={buttonVariants({ size: 'sm' }) + ' h-8'}>
+              Dispatch route
+            </Link>
+          )}
+        </div>
       </div>
 
-      {/* MAP TOP + live vehicle sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <Card className="lg:col-span-8 overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> Live fleet map
-                </CardTitle>
-                <CardDescription>
-                  Routes & status · select a unit from the live strip
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
+      {/* Map + right stack (fuel then live units) — heights aligned */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch">
+        <Card className="lg:col-span-8 overflow-hidden flex flex-col gap-0 py-0">
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border shrink-0">
+            <span className="text-sm font-normal flex items-center gap-2">
+              <MapPin className="h-4 w-4" /> Live fleet map
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wider font-normal">
                 {onTripVehicles.length} en route
               </Badge>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs font-normal"
+                onClick={() => setMapFullscreen(true)}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+                Fullscreen
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[380px] md:h-[440px] w-full rounded-md overflow-hidden border border-border relative">
-              <LiveFleetMap
-                compact
-                showRoutes
-                selectedVehicleId={selectedVehicleId}
-                onSelectVehicle={setSelectedVehicleId}
-              />
-            </div>
-          </CardContent>
+          </div>
+          <div className="flex-1 min-h-[420px] h-[420px] md:min-h-[480px] md:h-[480px] w-full">
+            <LiveFleetMap
+              compact
+              fill
+              showRoutes
+              className="rounded-none border-0 shadow-none"
+              selectedVehicleId={selectedVehicleId}
+              onSelectVehicle={setSelectedVehicleId}
+            />
+          </div>
         </Card>
 
-        {/* Live vehicles — normal cards; updated unit slides to top */}
-        <Card className="lg:col-span-4 flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Radio className="h-4 w-4 text-emerald-500" /> Live vehicles
-            </CardTitle>
-            <CardDescription className="text-[11px]">
-              On update, unit slides to the top · click to focus map
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-2 overflow-y-auto max-h-[440px]">
-            {liveList.length === 0 && (
-              <p className="text-xs text-muted-foreground py-6 text-center">Waiting for telemetry…</p>
-            )}
-            {liveList.map(({ id, pos, vehicle, driver }) => {
-              const moving = (pos.speed || 0) > 3;
-              const selected = selectedVehicleId === id;
-              return (
-                <button
-                  key={id}
-                  ref={(el) => setVehicleRef(id, el)}
-                  type="button"
-                  onClick={() => setSelectedVehicleId(id === selectedVehicleId ? null : id)}
-                  className={`w-full text-left p-2.5 rounded-xl border cursor-pointer ${
-                    selected
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate">
-                        {vehicle?.registration_number}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {driver?.name || '—'} · {pos.destination || vehicle?.status}
-                      </div>
+        <div className="lg:col-span-4 flex flex-col gap-2.5 min-h-0 h-auto md:h-[calc(1.5rem+480px)]">
+          {/* Global fuel index */}
+          <Card className="border-border/50 shrink-0 gap-0 py-0">
+            <div className="px-3 py-1.5 border-b border-border">
+              <span className="text-xs text-muted-foreground uppercase tracking-widest font-normal">
+                Global fuel index
+              </span>
+            </div>
+            <div className="px-3 py-2">
+              {fuelIndex ? (
+                <>
+                  <div className="flex justify-between items-end mb-2">
+                    <div>
+                      <span className="text-2xl tracking-tight font-normal">
+                        ${fuelIndex.price.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-muted-foreground ml-1">/ L</span>
                     </div>
                     <Badge
-                      variant={moving ? 'default' : 'secondary'}
-                      className="text-[9px] shrink-0"
+                      variant="outline"
+                      className={`gap-1 font-normal ${
+                        fuelIndex.trend === 'rising'
+                          ? 'text-amber-400 border-amber-400/40 bg-amber-500/10'
+                          : fuelIndex.trend === 'falling'
+                            ? 'text-emerald-400 border-emerald-400/40 bg-emerald-500/10'
+                            : 'text-muted-foreground'
+                      }`}
                     >
-                      {moving ? `${Math.round(pos.speed)} km/h` : vehicle?.status}
+                      {fuelIndex.trend === 'rising' ? (
+                        <TrendingUp className="h-3.5 w-3.5" />
+                      ) : fuelIndex.trend === 'falling' ? (
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <Minus className="h-3.5 w-3.5" />
+                      )}
+                      {fuelIndex.changePercent}%
                     </Badge>
                   </div>
-                  {moving && typeof pos.progress === 'number' && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex justify-between text-[9px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> ETA {pos.eta_minutes}m
-                        </span>
-                        <span>{Math.round(pos.progress * 100)}%</span>
+
+                  {/* Amber stroke — always visible on dark cards */}
+                  <div className="h-[120px]">
+                    <ChartContainer
+                      config={{
+                        price: {
+                          label: 'Forecast price',
+                          color: '#fbbf24',
+                        },
+                      }}
+                      className="h-full w-full"
+                    >
+                      <AreaChart data={fuelForecast} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="dashFillPrice" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Area
+                          dataKey="price"
+                          type="monotone"
+                          stroke="#fbbf24"
+                          fill="url(#dashFillPrice)"
+                          strokeWidth={2.5}
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ChartContainer>
+                  </div>
+
+                  <div className="mt-2 p-2 bg-primary/10 rounded-lg border border-primary/20">
+                    <p className="text-[11px] text-primary flex items-start gap-2 leading-snug font-normal">
+                      <Brain className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      AI suggests locking fuel contracts this week before an anticipated 8% hike.
+                    </p>
+                  </div>
+                  <Link
+                    href="/economic-simulator"
+                    className={`${buttonVariants({ variant: 'outline', size: 'sm' })} w-full mt-2 font-normal`}
+                  >
+                    Open economics
+                  </Link>
+                </>
+              ) : (
+                <div className="h-32 animate-pulse bg-muted rounded-lg" />
+              )}
+            </div>
+          </Card>
+
+          {/* Live units below fuel */}
+          <Card className="flex flex-col min-h-0 flex-1 gap-0 py-0 overflow-hidden">
+            <div className="px-3 py-1.5 border-b border-border shrink-0">
+              <span className="text-sm font-normal flex items-center gap-2">
+                <Radio className="h-4 w-4 text-emerald-500" /> Live units
+              </span>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto px-3 py-2 min-h-0">
+              {liveList.length === 0 && (
+                <p className="text-xs text-muted-foreground py-4 text-center">
+                  Waiting for telemetry…
+                </p>
+              )}
+              {liveList.map(({ id, pos, vehicle, driver }) => {
+                const moving = (pos.speed || 0) > 3;
+                const selected = selectedVehicleId === id;
+                return (
+                  <button
+                    key={id}
+                    ref={(el) => setVehicleRef(id, el)}
+                    type="button"
+                    onClick={() => setSelectedVehicleId(id === selectedVehicleId ? null : id)}
+                    className={`w-full text-left p-2.5 rounded-xl border cursor-pointer ${
+                      selected
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                        : 'border-border hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm truncate font-normal">
+                          {vehicle?.registration_number}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {driver?.name || '—'} · {pos.destination || vehicle?.status}
+                        </div>
                       </div>
-                      <Progress value={pos.progress * 100}>
-                        <ProgressTrack className="h-1">
-                          <ProgressIndicator className="bg-emerald-500" />
-                        </ProgressTrack>
-                      </Progress>
+                      <Badge
+                        variant={moving ? 'default' : 'secondary'}
+                        className="text-[9px] shrink-0 font-normal"
+                      >
+                        {moving ? `${Math.round(pos.speed)} km/h` : vehicle?.status}
+                      </Badge>
                     </div>
-                  )}
-                </button>
-              );
-            })}
-            <Link
-              href="/vehicles"
-              className={`w-full mt-1 ${buttonVariants({ variant: 'outline', size: 'sm' })}`}
-            >
-              All vehicles <ArrowRight className="h-3.5 w-3.5 ml-1" />
-            </Link>
-          </CardContent>
-        </Card>
+                    {moving && typeof pos.progress === 'number' && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex justify-between text-[9px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> ETA {pos.eta_minutes}m
+                          </span>
+                          <span>{Math.round(pos.progress * 100)}%</span>
+                        </div>
+                        <Progress value={pos.progress * 100}>
+                          <ProgressTrack className="h-1">
+                            <ProgressIndicator className="bg-emerald-500" />
+                          </ProgressTrack>
+                        </Progress>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+              <Link
+                href="/vehicles"
+                className={`w-full mt-1 ${buttonVariants({ variant: 'outline', size: 'sm' })} font-normal`}
+              >
+                All vehicles <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Link>
+            </div>
+          </Card>
+        </div>
       </div>
 
+      {/* Fullscreen map popup */}
+      <Dialog open={mapFullscreen} onOpenChange={setMapFullscreen}>
+        <DialogContent className="sm:max-w-[min(96vw,1200px)] w-[96vw] h-[90vh] max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
+          <DialogHeader className="px-4 py-2.5 border-b border-border shrink-0 space-y-0">
+            <DialogTitle className="text-base font-normal flex items-center gap-2">
+              <MapPin className="h-4 w-4" /> Detailed live fleet map
+            </DialogTitle>
+            <DialogDescription className="text-xs font-normal">
+              Full view · click units for telemetry · routes update live
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 w-full">
+            <LiveFleetMap
+              fill
+              showRoutes
+              className="rounded-none border-0 shadow-none h-full"
+              selectedVehicleId={selectedVehicleId}
+              onSelectVehicle={setSelectedVehicleId}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Live trips · activity · maint · insights */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         {canAccess('trips', 'read') && (
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <CardTitle className="text-sm font-normal flex items-center gap-2">
                 <Navigation className="h-4 w-4 text-blue-500" /> Live & new trips
               </CardTitle>
               <CardDescription className="text-[11px]">Click any card → Trips</CardDescription>
@@ -883,7 +832,7 @@ export default function Dashboard() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-xs font-bold">#{t.trip_number}</div>
+                      <div className="text-xs font-normal">#{t.trip_number}</div>
                       <div className="text-[10px] text-muted-foreground truncate">
                         {t.kind === 'draft' ? 'Draft · ' : ''}
                         {t.source} → {t.destination}
@@ -919,7 +868,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <CardTitle className="text-sm font-normal flex items-center gap-2">
               <Activity className="h-4 w-4" /> Live activity
             </CardTitle>
             <CardDescription className="text-[11px]">Updates slide to the top</CardDescription>
@@ -945,7 +894,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <CardTitle className="text-sm font-normal flex items-center gap-2">
               <Wrench className="h-4 w-4 text-orange-500" /> Maint · Fuel
             </CardTitle>
             <CardDescription className="text-[11px]">Service queue & cost desk</CardDescription>
@@ -958,7 +907,7 @@ export default function Dashboard() {
                 href={card.href}
                 className="block p-2.5 border border-border rounded-lg hover:bg-muted/50"
               >
-                <div className="text-xs font-semibold">{card.reg}</div>
+                <div className="text-xs font-medium">{card.reg}</div>
                 <div className="text-[10px] text-muted-foreground line-clamp-2">
                   {card.description}
                 </div>
@@ -989,7 +938,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <CardTitle className="text-sm font-normal flex items-center gap-2">
               <Newspaper className="h-4 w-4 text-purple-500" /> News & insights
             </CardTitle>
             <CardDescription className="text-[11px]">{role} focus</CardDescription>
@@ -1012,7 +961,7 @@ export default function Dashboard() {
 
             {role === 'Safety Officer' && (
               <div className="space-y-1.5 pt-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                <span className="text-[10px] font-normal text-muted-foreground uppercase">
                   License watch
                 </span>
                 {expiringLicenses.length === 0 ? (
@@ -1035,7 +984,7 @@ export default function Dashboard() {
 
             {role === 'Fleet Manager' && inShopVehicles.length > 0 && (
               <div className="space-y-1.5 pt-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                <span className="text-[10px] font-normal text-muted-foreground uppercase">
                   In-shop units
                 </span>
                 {inShopVehicles.slice(0, 2).map((v) => (
@@ -1044,7 +993,7 @@ export default function Dashboard() {
                     href="/vehicles"
                     className="flex justify-between p-2 border rounded-md text-xs hover:bg-muted/50"
                   >
-                    <span className="font-semibold">{v.registration_number}</span>
+                    <span className="font-medium">{v.registration_number}</span>
                     <Badge variant="destructive" className="text-[9px]">
                       In Shop
                     </Badge>
@@ -1082,10 +1031,10 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-base font-normal">
               <Activity className="h-5 w-5" /> Safety score distribution
             </CardTitle>
-            <CardDescription>Driver behavioral scores from telematics</CardDescription>
+            <CardDescription className="font-normal">Driver behavioral scores from telematics</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[200px]">
@@ -1102,7 +1051,8 @@ export default function Dashboard() {
                     type="category"
                     axisLine={false}
                     tickLine={false}
-                    style={{ fontSize: '12px', fill: 'hsl(var(--foreground))', fontWeight: 500 }}
+                    tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 400 }}
+                    className="text-foreground"
                     width={120}
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />

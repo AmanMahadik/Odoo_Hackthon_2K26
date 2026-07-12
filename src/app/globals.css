@@ -129,15 +129,19 @@
   }
 }
 
-/* Live KPI marquee */
+/* Continuous live ticker under nav */
 @keyframes transitops-marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-33.333%, 0, 0);
+  }
 }
 .transitops-marquee-track {
-  display: flex;
+  display: inline-flex;
   width: max-content;
-  animation: transitops-marquee 28s linear infinite;
+  animation: transitops-marquee 22s linear infinite;
 }
 .transitops-marquee-track:hover {
   animation-play-state: paused;
