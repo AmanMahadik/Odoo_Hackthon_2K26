@@ -72,31 +72,35 @@ export default function LiveOpsMarquee() {
   const loop = [...display, ...display, ...display];
 
   return (
-    <div className="w-full shrink-0 border-b border-border bg-muted/30">
-      {/* Single fixed row — never wraps/collapses */}
-      <div className="relative flex h-8 items-center overflow-hidden whitespace-nowrap">
-        <div className="z-20 flex h-8 shrink-0 items-center gap-1.5 border-r border-border bg-muted/90 px-3 text-[10px] tracking-wider text-muted-foreground">
-          <span className="relative flex h-1.5 w-1.5 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          </span>
-          <span className="leading-none">LIVE</span>
-        </div>
+    <div className="w-full shrink-0 border-b border-border bg-muted/25">
+      <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6">
+        <div className="relative flex h-7 items-center overflow-hidden">
+          {/* LIVE label — small, fixed, never wraps */}
+          <div className="z-20 flex h-7 shrink-0 items-center gap-1.5 pr-2.5 mr-1 border-r border-border/80">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground font-normal leading-none">
+              Live
+            </span>
+          </div>
 
-        <div className="relative h-8 min-w-0 flex-1 overflow-hidden">
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-muted/40 to-transparent" />
-          <div className="transitops-marquee-track h-8 items-center">
-            {loop.map((item, i) => (
-              <Link
-                key={`${item.label}-${i}`}
-                href={item.href}
-                className="inline-flex h-8 shrink-0 items-center gap-2 px-3 text-[12px] leading-none text-foreground/90 hover:text-foreground font-normal"
-              >
-                <span className="text-muted-foreground font-normal leading-none">{item.label}</span>
-                <span className="tabular-nums font-normal leading-none">{item.value}</span>
-                <span className="text-muted-foreground/35 leading-none">·</span>
-              </Link>
-            ))}
+          <div className="relative h-7 min-w-0 flex-1 overflow-hidden">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-muted/40 to-transparent" />
+            <div className="transitops-marquee-track h-7 items-center">
+              {loop.map((item, i) => (
+                <Link
+                  key={`${item.label}-${i}`}
+                  href={item.href}
+                  className="inline-flex h-7 shrink-0 items-center gap-1.5 px-2.5 text-[11px] leading-none text-foreground/85 hover:text-foreground font-normal whitespace-nowrap"
+                >
+                  <span className="text-muted-foreground font-normal">{item.label}</span>
+                  <span className="tabular-nums font-normal text-foreground/90">{item.value}</span>
+                  <span className="text-muted-foreground/30 pl-1">·</span>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>

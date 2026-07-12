@@ -57,66 +57,65 @@ export default function Shell({ children }: ShellProps) {
     <div className="flex flex-col min-h-screen bg-background font-sans antialiased">
       {/* Top Header & Navigation */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 md:px-5">
-          <div className="flex h-14 items-center justify-between relative">
+        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6">
+          {/* 3-column grid so center nav is never covered and stays clickable */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3.5 md:py-4 min-h-[4rem]">
             {/* Logo / Brand (Left) */}
-            <Link href="/" className="flex items-center gap-2.5 flex-1 min-w-0">
-              <img src="/icon/light.png" alt="TransitOps" className="h-10 w-auto dark:hidden shrink-0" />
-              <img src="/icon/dark.png" alt="TransitOps" className="h-10 w-auto hidden dark:block shrink-0" />
-              <span className="text-xl tracking-tight">TransitOps</span>
-              <Badge variant="secondary" className="ml-1 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0">
+            <Link href="/" className="flex items-center gap-1 min-w-0 justify-self-start">
+              <img src="/icon/light.png" alt="TransitOps" className="h-8 w-auto dark:hidden shrink-0" />
+              <img src="/icon/dark.png" alt="TransitOps" className="h-8 w-auto hidden dark:block shrink-0" />
+              <span className="text-base md:text-lg tracking-tight font-medium">TransitOps</span>
+              <Badge variant="secondary" className="ml-1.5 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0 font-normal">
                 {role}
               </Badge>
             </Link>
 
-            {/* Desktop Tabs Navigation (Center Pill) */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:flex items-center justify-center">
-              <nav className="flex items-center space-x-1 bg-muted/50 border border-border rounded-full p-1 shadow-sm">
-                {sidebarItems.map((item) => {
-                  const Icon = iconMap[item.icon] || LayoutDashboard;
-                  const isActive = pathname === item.path || (item.subItems && item.subItems.some(sub => sub.path === pathname));
-                  
-                  if (item.subItems) {
-                    return (
-                      <DropdownMenu key={item.name}>
-                        <DropdownMenuTrigger className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full outline-none cursor-pointer ${isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
-                           <Icon className="h-4 w-4" />
-                           {item.name}
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-48 rounded-xl">
-                           {item.subItems.map(sub => {
-                             const SubIcon = iconMap[sub.icon] || LayoutDashboard;
-                             return (
-                               <DropdownMenuItem key={sub.path} className="rounded-lg p-0">
-                                 <Link href={sub.path} className="flex items-center gap-2 cursor-pointer w-full px-2 py-1.5">
-                                   <SubIcon className="h-4 w-4 text-muted-foreground" />
-                                   {sub.name}
-                                 </Link>
-                               </DropdownMenuItem>
-                             )
-                           })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )
-                  }
-
+            {/* Desktop Tabs Navigation (Center) — own column so nothing overlays it */}
+            <nav className="hidden md:flex items-center space-x-1 bg-muted/50 border border-border rounded-full p-1 shadow-sm justify-self-center relative z-50">
+              {sidebarItems.map((item) => {
+                const Icon = iconMap[item.icon] || LayoutDashboard;
+                const isActive = pathname === item.path || (item.subItems && item.subItems.some(sub => sub.path === pathname));
+                
+                if (item.subItems) {
                   return (
-                    <Link
-                      key={item.path + item.name}
-                      href={item.path!}
-                      className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full ${
-                        isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
+                    <DropdownMenu key={item.name}>
+                      <DropdownMenuTrigger className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full outline-none cursor-pointer pointer-events-auto ${isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
+                         <Icon className="h-4 w-4" />
+                         {item.name}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-48 rounded-xl z-[100]">
+                         {item.subItems.map(sub => {
+                           const SubIcon = iconMap[sub.icon] || LayoutDashboard;
+                           return (
+                             <DropdownMenuItem key={sub.path} className="rounded-lg p-0">
+                               <Link href={sub.path} className="flex items-center gap-2 cursor-pointer w-full px-2 py-1.5">
+                                 <SubIcon className="h-4 w-4 text-muted-foreground" />
+                                 {sub.name}
+                               </Link>
+                             </DropdownMenuItem>
+                           )
+                         })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )
+                }
 
-            <div className="flex items-center gap-2 md:gap-4">
+                return (
+                  <Link
+                    key={item.path + item.name}
+                    href={item.path!}
+                    className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full pointer-events-auto ${
+                      isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="flex items-center gap-2 md:gap-3 shrink-0 justify-self-end">
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="relative flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none">
@@ -371,11 +370,11 @@ export default function Shell({ children }: ShellProps) {
         </div>
       )}
 
-      {/* Main — same width as title bar; no extra title gap on dashboard (page owns row) */}
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-3 sm:px-4 md:px-5 py-2 md:py-3">
+      {/* Main — same max width as title bar, roomy top/bottom spacing */}
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-6 pt-5 md:pt-7 pb-6 md:pb-8">
         {pathname !== '/' && (
-          <div className="mb-2 flex items-center justify-between">
-            <h1 className="text-lg tracking-tight text-foreground font-normal">{currentPage}</h1>
+          <div className="mb-5 flex items-center justify-between">
+            <h1 className="text-xl tracking-tight text-foreground font-medium">{currentPage}</h1>
           </div>
         )}
         {children}
