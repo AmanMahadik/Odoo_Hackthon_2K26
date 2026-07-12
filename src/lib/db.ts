@@ -70,10 +70,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('vehicles').insert([v]).select().single();
-        if (!error && data) return data;
-        console.error("Create vehicle in Supabase error, creating locally:", error);
-      } catch (err) {
-        console.error("Create vehicle error:", err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create vehicle Supabase error:", err.message || err);
+        throw err;
       }
     }
     // Sandbox
@@ -88,9 +89,11 @@ export const db = {
     if (isLiveMode && !id.startsWith('v_')) {
       try {
         const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update vehicle Supabase error:", err.message || err);
+        throw err;
       }
     }
     // Sandbox
@@ -118,9 +121,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('drivers').insert([d]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create driver Supabase error:", err.message || err);
+        throw err;
       }
     }
     const drivers = getSandboxState<Driver>('drivers', mockDrivers);
@@ -134,9 +139,11 @@ export const db = {
     if (isLiveMode && !id.startsWith('d_')) {
       try {
         const { data, error } = await supabase.from('drivers').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update driver Supabase error:", err.message || err);
+        throw err;
       }
     }
     const drivers = getSandboxState<Driver>('drivers', mockDrivers);
@@ -202,13 +209,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('trips').insert([t]).select().single();
-        if (!error && data) {
-          // Trigger updates status dynamically if handled via Postgres triggers, or client falls back
-          return data;
-        }
-        console.error("Create trip DB error, using sandbox:", error);
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create trip Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -239,9 +244,11 @@ export const db = {
     if (isLiveMode && !id.startsWith('t_')) {
       try {
         const { data, error } = await supabase.from('trips').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update trip Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -305,9 +312,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').insert([l]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create maintenance log Supabase error:", err.message || err);
+        throw err;
       }
     }
     const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
@@ -333,9 +342,11 @@ export const db = {
     if (isLiveMode && !id.startsWith('m_')) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update maintenance log Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -374,8 +385,8 @@ export const db = {
       try {
         const { data, error } = await supabase.from('fuel_logs').select('*, vehicle:vehicles(*)').order('log_date', { ascending: false });
         if (!error && data && data.length > 0) return data as unknown as FuelLog[];
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("Get fuel logs Supabase error:", err.message || err);
       }
     }
     const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
@@ -390,9 +401,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('fuel_logs').insert([f]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create fuel log Supabase error:", err.message || err);
+        throw err;
       }
     }
     const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
@@ -408,8 +421,8 @@ export const db = {
       try {
         const { data, error } = await supabase.from('expenses').select('*, vehicle:vehicles(*)').order('expense_date', { ascending: false });
         if (!error && data && data.length > 0) return data as unknown as Expense[];
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        console.error("Get expenses Supabase error:", err.message || err);
       }
     }
     const expensesList = getSandboxState<Expense>('expenses', mockExpenses);
@@ -424,9 +437,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('expenses').insert([e]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create expense Supabase error:", err.message || err);
+        throw err;
       }
     }
     const expensesList = getSandboxState<Expense>('expenses', mockExpenses);
@@ -434,6 +449,122 @@ export const db = {
     expensesList.push(newExpense);
     saveSandboxState('expenses', expensesList);
     return newExpense;
+  },
+
+  // PROFILES
+  async getDriverProfiles(): Promise<any[]> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'Driver')
+          .order('full_name');
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Get driver profiles Supabase error:", err.message || err);
+      }
+    }
+    return [
+      { id: 'sb_driver_1', full_name: 'Alex Johnson', role: 'Driver', contact_number: '+1-555-0101' },
+      { id: 'sb_driver_2', full_name: 'Sarah Chen', role: 'Driver', contact_number: '+1-555-0102' },
+      { id: 'sb_driver_3', full_name: 'Mike Ross', role: 'Driver', contact_number: '+1-555-0103' }
+    ];
+  },
+
+  async getProfile(userId: string): Promise<any | null> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (!error && data) return data;
+      } catch (err) {
+        console.error("Get profile error:", err);
+      }
+    }
+    return {
+      id: userId,
+      full_name: 'Sandbox Admin',
+      role: 'Fleet Manager',
+      contact_number: '+1-555-0199'
+    };
+  },
+
+  async updateProfile(userId: string, updates: any): Promise<any> {
+    if (isLiveMode) {
+      try {
+        // 1. Fetch current profile row if exists
+        const { data: existing } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+        
+        let data: any;
+        let error: any;
+
+        if (existing) {
+          // If profile exists, use UPDATE and strip 'role' so it CANNOT be changed
+          const { role, id, ...allowedUpdates } = updates;
+          const res = await supabase
+            .from('profiles')
+            .update(allowedUpdates)
+            .eq('id', userId)
+            .select()
+            .single();
+          data = res.data;
+          error = res.error;
+        } else {
+          // If profile does not exist (backfill on update), use INSERT with initial role
+          const payload = { 
+            id: userId, 
+            full_name: updates.full_name || 'Auth User',
+            role: updates.role || 'Fleet Manager',
+            contact_number: updates.contact_number
+          };
+          const res = await supabase
+            .from('profiles')
+            .insert([payload])
+            .select()
+            .single();
+          data = res.data;
+          error = res.error;
+        }
+
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update profile Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    return {
+      id: userId,
+      full_name: updates.full_name || 'Sandbox Admin',
+      role: 'Fleet Manager',
+      contact_number: updates.contact_number
+    };
+  },
+
+  async backfillProfiles(): Promise<{ success: boolean; count: number; message: string }> {
+    if (isLiveMode) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return { success: false, count: 0, message: "No active session found." };
+
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+        if (!profile) {
+          const { error } = await supabase.from('profiles').insert([{
+            id: session.user.id,
+            full_name: session.user.user_metadata?.full_name || 'Restored User',
+            role: session.user.user_metadata?.role || 'Fleet Manager'
+          }]);
+          if (error) throw error;
+          return { success: true, count: 1, message: "Missing profile backfilled successfully." };
+        }
+        return { success: true, count: 0, message: "Profile already exists." };
+      } catch (err: any) {
+        console.error("Backfill error:", err);
+        return { success: false, count: 0, message: err.message || "Failed to backfill." };
+      }
+    }
+    return { success: true, count: 0, message: "Sandbox mode. No backfill needed." };
   },
 
   // NOTIFICATIONS (generated dynamically from data state to satisfy the dynamic rule)

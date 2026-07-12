@@ -36,6 +36,26 @@ function DriversContent() {
   const [expiry, setExpiry] = useState('');
   const [contact, setContact] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [driverProfiles, setDriverProfiles] = useState<any[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState('');
+
+  // Unlinked profiles that aren't already registered as drivers
+  const unlinkedProfiles = driverProfiles.filter(p => 
+    !drivers.some(d => d.user_id === p.id)
+  );
+
+  useEffect(() => {
+    if (selectedProfileId) {
+      const selected = driverProfiles.find(p => p.id === selectedProfileId);
+      if (selected) {
+        setName(selected.full_name);
+        setContact(selected.contact_number || '');
+      }
+    } else {
+      setName('');
+      setContact('');
+    }
+  }, [selectedProfileId, driverProfiles]);
 
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
@@ -50,8 +70,12 @@ function DriversContent() {
   const fetchDrivers = async () => {
     setLoading(true);
     try {
-      const data = await db.getDrivers();
+      const [data, profiles] = await Promise.all([
+        db.getDrivers(),
+        db.getDriverProfiles()
+      ]);
       setDrivers(data);
+      setDriverProfiles(profiles);
     } catch (err) {
       console.error(err);
     } finally {
@@ -70,6 +94,11 @@ function DriversContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (!selectedProfileId) {
+      setErrorMsg('Please select and link a registered driver user account.');
+      return;
+    }
 
     if (!name || !licenseNum || !expiry || !contact) {
       setErrorMsg('Please fill in all required fields.');
@@ -93,7 +122,8 @@ function DriversContent() {
         license_expiry_date: expiry,
         contact_number: contact.trim(),
         safety_score: 100, // default new safety score
-        status: 'Available'
+        status: 'Available',
+        user_id: selectedProfileId
       });
 
       // Reset
@@ -101,10 +131,17 @@ function DriversContent() {
       setLicenseNum('');
       setExpiry('');
       setContact('');
+      setSelectedProfileId('');
       setIsOpen(false);
       fetchDrivers();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error creating driver.');
+      let msg = err.message || 'Error creating driver.';
+      if (msg.includes('duplicate key') || msg.includes('drivers_license_number_key') || err.code === '23505') {
+        msg = `A driver with license number ${licenseNum.toUpperCase()} already exists in the database.`;
+      } else if (msg.includes('row-level security') || err.code === '42501') {
+        msg = 'Permission denied: Only Fleet Managers and Safety Officers are authorized to register drivers.';
+      }
+      setErrorMsg(msg);
     }
   };
 
@@ -274,7 +311,14 @@ function DriversContent() {
               <tbody className="divide-y divide-slate-850">
                 {sortedDrivers.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="p-4 font-bold text-slate-200">{d.name}</td>
+                    <td className="p-4">
+                      <span className="font-bold text-slate-200 block">{d.name}</span>
+                      {d.user?.email && (
+                        <span className="text-[10px] text-slate-500 block mt-0.5 font-mono select-all">
+                          {d.user.email}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-slate-300 font-mono uppercase">{d.license_number}</td>
                     <td className="p-4 text-slate-400">{d.license_category}</td>
                     <td className="p-4 text-slate-400">{d.contact_number}</td>
@@ -347,14 +391,36 @@ function DriversContent() {
               )}
 
               <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Link Driver Account</label>
+                <select
+                  required
+                  value={selectedProfileId}
+                  onChange={(e) => setSelectedProfileId(e.target.value)}
+                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none cursor-pointer mb-3"
+                >
+                  <option value="">-- Select Registered Driver User --</option>
+                  {unlinkedProfiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name} ({p.email || 'No email/Sandbox'})
+                    </option>
+                  ))}
+                </select>
+                {unlinkedProfiles.length === 0 && (
+                  <p className="text-[10px] text-amber-500 font-semibold leading-relaxed mt-1">
+                    ⚠️ No unlinked driver accounts available. Ensure driver users have signed up first.
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Full Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Mike Ross"
+                  readOnly
+                  placeholder="Will auto-fill from user account"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                  className="w-full bg-[#161B30]/50 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-450 cursor-not-allowed focus:outline-none"
                 />
               </div>
 

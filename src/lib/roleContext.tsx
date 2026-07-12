@@ -3,13 +3,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { useRouter, usePathname } from 'next/navigation';
+import { db } from './db';
 
 export type Role = 'Fleet Manager' | 'Dispatcher' | 'Safety Officer' | 'Financial Analyst' | 'Driver';
+
+export type Theme = 'light' | 'dark';
 
 interface UserProfile {
   id: string;
   full_name: string;
   role: Role;
+  email?: string;
   contact_number?: string;
 }
 
@@ -20,11 +24,14 @@ interface RoleContextType {
   profile: UserProfile | null;
   loading: boolean;
   isSandboxMode: boolean;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
   login: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, fullName: string, role: Role) => Promise<{ error: any; data: any }>;
   signOut: () => Promise<void>;
   enterSandbox: (selectedRole: Role) => void;
   canAccess: (resource: string, action: 'create' | 'read' | 'update' | 'delete' | 'dispatch' | 'export') => boolean;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -35,13 +42,22 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [theme, setThemeState] = useState<Theme>('dark');
   const router = useRouter();
   const pathname = usePathname();
 
-  // Load session from Supabase on mount
+  // Load session and theme from local storage / Supabase on mount
   useEffect(() => {
     async function loadSession() {
       try {
+        // Load theme
+        const savedTheme = localStorage.getItem('transitops_theme') as Theme;
+        if (savedTheme) {
+          setThemeState(savedTheme);
+        } else {
+          localStorage.setItem('transitops_theme', 'dark');
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           setUser(session.user);
@@ -115,18 +131,32 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         setProfile(data);
         setRoleState(data.role);
       } else {
-        console.warn("Profile fetch error, creating placeholder profile:", error);
-        // Fallback profile if DB table is missing
+        // Profile row is missing in Supabase! Auto-backfill using user metadata immediately
+        const { data: { session } } = await supabase.auth.getSession();
+        const metadata = session?.user?.user_metadata;
         const fallbackProfile: UserProfile = {
           id: userId,
-          full_name: 'Auth User',
-          role: 'Fleet Manager'
+          full_name: metadata?.full_name || 'Auth User',
+          role: (metadata?.role as Role) || 'Fleet Manager',
+          email: session?.user?.email || ''
         };
-        setProfile(fallbackProfile);
-        setRoleState('Fleet Manager');
+        
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert([fallbackProfile])
+          .select()
+          .single();
+          
+        if (!insertError && newProfile) {
+          setProfile(newProfile);
+          setRoleState(newProfile.role);
+        } else {
+          setProfile(fallbackProfile);
+          setRoleState(fallbackProfile.role);
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchProfile error:", err);
     }
   }
 
@@ -177,6 +207,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     router.push('/');
   };
 
+  const setTheme = (t: Theme) => {
+    localStorage.setItem('transitops_theme', t);
+    setThemeState(t);
+  };
+
   const setRole = (newRole: Role) => {
     setRoleState(newRole);
     if (isSandboxMode) {
@@ -210,10 +245,25 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (isSandboxMode) {
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      return;
+    }
+    if (user) {
+      const data = await db.updateProfile(user.id, {
+        ...updates,
+        role: profile?.role || 'Fleet Manager'
+      });
+      setProfile(data);
+      setRoleState(data.role);
+    }
+  };
+
   return (
     <RoleContext.Provider value={{ 
-      role, setRole, user, profile, loading, isSandboxMode, 
-      login, signUp, signOut, enterSandbox, canAccess 
+      role, setRole, user, profile, loading, isSandboxMode, theme, setTheme,
+      login, signUp, signOut, enterSandbox, canAccess, updateProfile 
     }}>
       {children}
     </RoleContext.Provider>

@@ -131,7 +131,13 @@ function VehiclesContent() {
       // Refresh list
       fetchVehicles();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error creating vehicle.');
+      let msg = err.message || 'Error creating vehicle.';
+      if (msg.includes('duplicate key') || msg.includes('vehicles_registration_number_key') || err.code === '23505') {
+        msg = `A vehicle with registration number ${regNum.toUpperCase()} already exists in the database.`;
+      } else if (msg.includes('row-level security') || err.code === '42501') {
+        msg = 'Permission denied: Only Fleet Managers are authorized to register vehicles.';
+      }
+      setErrorMsg(msg);
     }
   };
 

@@ -27,7 +27,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, setRole, profile, signOut, isSandboxMode } = useRole();
+  const { role, setRole, profile, signOut, isSandboxMode, theme } = useRole();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const [notifications, setNotifications] = useState<{ id: string; type: string; text: string; time: string }[]>([]);
@@ -65,9 +65,13 @@ export default function Shell({ children }: ShellProps) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased">
+    <div className={`flex min-h-screen font-sans antialiased transition-colors duration-300 ${
+      theme === 'light' ? 'bg-slate-50 text-slate-900' : 'bg-[#0B0F19] text-slate-100'
+    }`}>
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-[#0F1424]/90 backdrop-blur-md flex flex-col justify-between fixed top-0 bottom-0 left-0 z-20 print:hidden">
+      <aside className={`w-64 border-r flex flex-col justify-between fixed top-0 bottom-0 left-0 z-20 print:hidden ${
+        theme === 'light' ? 'bg-[#0f1222] border-slate-800' : 'bg-[#0F1424]/90 border-slate-800'
+      }`}>
         <div>
           {/* Logo */}
           <div className="p-6 flex items-center gap-3 border-b border-slate-880 bg-gradient-to-r from-blue-600/20 to-purple-600/0">
@@ -112,39 +116,23 @@ export default function Shell({ children }: ShellProps) {
             })}
           </nav>
         </div>
-
-        {/* Role Simulator Switcher */}
-        <div className="p-4 border-t border-slate-800 bg-[#0c101d] m-3 rounded-2xl border border-slate-800/60 shadow-inner">
-          <div className="flex items-center gap-2 mb-2">
-            <CircleDot className="h-4 w-4 text-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-              Role Simulator
-            </span>
-          </div>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full bg-[#161B30] border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all cursor-pointer"
-          >
-            {roles.map((r) => (
-              <option key={r} value={r} className="bg-[#12162B] text-slate-200">
-                {r}
-              </option>
-            ))}
-          </select>
-          <div className="mt-2 text-[10px] text-slate-400 leading-tight">
-            Simulating client checks for <span className="text-blue-400 font-semibold">{role}</span> permissions.
-          </div>
-        </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 pl-64 flex flex-col min-h-screen print:pl-0">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-800 bg-[#0F1424]/40 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-10 print:hidden">
+        <header className={`h-16 border-b px-8 flex items-center justify-between sticky top-0 z-10 print:hidden backdrop-blur-md ${
+          theme === 'light' ? 'bg-white/70 border-slate-200 text-slate-800' : 'bg-[#0F1424]/40 border-slate-800 text-slate-200'
+        }`}>
           <div>
-            <h1 className="text-lg font-bold text-slate-200">
-              {pathname === '/' ? 'Operations Dashboard' : menuItems.find(m => m.path === pathname)?.name}
+            <h1 className={`text-lg font-bold transition-colors ${
+              theme === 'light' ? 'text-slate-900' : 'text-slate-200'
+            }`}>
+              {pathname === '/' 
+                ? 'Operations Dashboard' 
+                : pathname === '/profile' 
+                ? 'Account Settings' 
+                : menuItems.find(m => m.path === pathname)?.name || 'TransitOps'}
             </h1>
             <p className="text-xs text-slate-400 font-medium">
               Real-time Fleet Status & Telematics
@@ -193,17 +181,19 @@ export default function Shell({ children }: ShellProps) {
 
             {/* Profile Avatar & Sign Out */}
             <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-                {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
-              </div>
-              <div className="text-left hidden md:block">
-                <span className="block text-xs font-semibold text-slate-200 truncate max-w-[120px]" title={profile?.full_name || 'Aman Mahadik'}>
-                  {profile?.full_name || 'Aman Mahadik'}
-                </span>
-                <span className="block text-[10px] text-slate-500 font-medium">
-                  {role} {isSandboxMode ? '(Sandbox)' : ''}
-                </span>
-              </div>
+              <Link href="/profile" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+                  {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
+                </div>
+                <div className="text-left hidden md:block">
+                  <span className="block text-xs font-semibold text-slate-200 truncate max-w-[120px]" title={profile?.full_name || 'Aman Mahadik'}>
+                    {profile?.full_name || 'Aman Mahadik'}
+                  </span>
+                  <span className="block text-[10px] text-slate-500 font-medium">
+                    {role} {isSandboxMode ? '(Sandbox)' : ''}
+                  </span>
+                </div>
+              </Link>
               <button
                 onClick={signOut}
                 title="Sign Out"
@@ -216,7 +206,9 @@ export default function Shell({ children }: ShellProps) {
         </header>
 
         {/* Content Wrapper */}
-        <main className="flex-grow p-8 bg-gradient-to-b from-[#0B0F19] to-[#080B12] print:p-0 print:bg-transparent">
+        <main className={`flex-grow p-8 print:p-0 print:bg-transparent ${
+          theme === 'light' ? 'bg-slate-50' : 'bg-gradient-to-b from-[#0B0F19] to-[#080B12]'
+        }`}>
           {children}
         </main>
       </div>
