@@ -161,9 +161,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
           setProfile(data);
           setRoleState(data.role);
         } else {
-          // Fallback if not mapped
-          setProfile({ id: userId, full_name: user?.fullName || 'Auth User', role: 'Fleet Manager' });
-          setRoleState('Fleet Manager');
+          // New user -> no profile mapped yet -> redirect to onboarding
+          setProfile(null);
         }
       } catch (err) {
         console.error(err);
@@ -180,14 +179,27 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isLoaded, isSignedIn, user]);
 
-  // Route guard: redirect if role doesn't have access
+  // Route guard: redirect if role doesn't have access or if profile is missing
   useEffect(() => {
-    if (loading) return;
+    if (loading || !isSignedIn) return;
     if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up')) return;
-    if (!canAccessRoute(role, pathname)) {
+    
+    // If user has no profile, force them to onboarding
+    if (!profile && pathname !== '/onboarding') {
+      router.push('/onboarding');
+      return;
+    }
+
+    // If they have a profile, don't let them go back to onboarding
+    if (profile && pathname === '/onboarding') {
+      router.push('/');
+      return;
+    }
+
+    if (pathname !== '/onboarding' && !canAccessRoute(role, pathname)) {
       router.push('/');
     }
-  }, [role, pathname, loading, router]);
+  }, [role, pathname, loading, router, profile]);
 
   const signOut = async () => {
     try {
@@ -216,8 +228,8 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (user) {
       const data = await db.updateProfile(user.id, {
-        ...updates,
-        role: profile?.role || 'Fleet Manager'
+        role: profile?.role || 'Fleet Manager',
+        ...updates
       });
       setProfile(data);
       setRoleState(data.role);
