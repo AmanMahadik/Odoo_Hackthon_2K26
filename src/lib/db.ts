@@ -4,6 +4,9 @@ import {
   mockVehicles, mockDrivers, mockTrips, mockMaintenanceLogs, mockFuelLogs, mockExpenses 
 } from './mockData';
 
+// Safe helper to check if a string matches PostgreSQL UUID format
+const isUuid = (val: string): boolean => typeof val === 'string' && val.length === 36 && val.includes('-');
+
 // Safe helper to load sandbox state from localStorage or initialize
 const getSandboxState = <T>(key: string, defaultState: T[]): T[] => {
   if (typeof window === 'undefined') return defaultState;
@@ -56,6 +59,24 @@ export const db = {
   // Check active mode
   getMode: () => isLiveMode ? 'Live Database' : 'Sandbox (Offline/Unseeded DB)',
 
+  // DOCUMENTS
+  async uploadDocument(file: File, path: string): Promise<string | null> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
+        if (error) throw error;
+        
+        const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(path);
+        return publicUrlData.publicUrl;
+      } catch (err: any) {
+        console.error("Upload document error:", err.message || err);
+        return null;
+      }
+    }
+    // Sandbox simulation: just return a local blob URL
+    return URL.createObjectURL(file);
+  },
+
   // VEHICLES
   async getVehicles(): Promise<Vehicle[]> {
     const { data } = await executeQuery<any>(
@@ -86,7 +107,7 @@ export const db = {
   },
 
   async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle> {
-    if (isLiveMode && !id.startsWith('v_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select().single();
         if (error) throw error;
@@ -136,7 +157,7 @@ export const db = {
   },
 
   async updateDriver(id: string, updates: Partial<Driver>): Promise<Driver> {
-    if (isLiveMode && !id.startsWith('d_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('drivers').update(updates).eq('id', id).select().single();
         if (error) throw error;
@@ -167,7 +188,7 @@ export const db = {
           driver:drivers(*)
         `).order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data as unknown as Trip[];
         }
       } catch (err) {
@@ -241,7 +262,7 @@ export const db = {
     const trips = getSandboxState<Trip>('trips', mockTrips);
     const currentTrip = trips.find(x => x.id === id);
 
-    if (isLiveMode && !id.startsWith('t_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('trips').update(updates).eq('id', id).select().single();
         if (error) throw error;
@@ -295,7 +316,7 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').select('*, vehicle:vehicles(*)').order('opened_at', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as MaintenanceLog[];
+        if (!error && data) return data as unknown as MaintenanceLog[];
       } catch (err) {
         console.error(err);
       }
@@ -339,7 +360,7 @@ export const db = {
     const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
     const currentLog = logs.find(x => x.id === id);
 
-    if (isLiveMode && !id.startsWith('m_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').update(updates).eq('id', id).select().single();
         if (error) throw error;
@@ -384,7 +405,7 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('fuel_logs').select('*, vehicle:vehicles(*)').order('log_date', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as FuelLog[];
+        if (!error && data) return data as unknown as FuelLog[];
       } catch (err: any) {
         console.error("Get fuel logs Supabase error:", err.message || err);
       }
@@ -420,7 +441,7 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('expenses').select('*, vehicle:vehicles(*)').order('expense_date', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as Expense[];
+        if (!error && data) return data as unknown as Expense[];
       } catch (err: any) {
         console.error("Get expenses Supabase error:", err.message || err);
       }
@@ -565,6 +586,108 @@ export const db = {
       }
     }
     return { success: true, count: 0, message: "Sandbox mode. No backfill needed." };
+  },
+
+  async deleteVehicle(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('vehicles').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete vehicle Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const vehicles = getSandboxState<Vehicle>('vehicles', mockVehicles);
+    const filtered = vehicles.filter(x => x.id !== id);
+    saveSandboxState('vehicles', filtered);
+    return true;
+  },
+
+  async deleteDriver(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('drivers').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete driver Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const drivers = getSandboxState<Driver>('drivers', mockDrivers);
+    const filtered = drivers.filter(x => x.id !== id);
+    saveSandboxState('drivers', filtered);
+    return true;
+  },
+
+  async deleteTrip(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('trips').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete trip Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const trips = getSandboxState<Trip>('trips', mockTrips);
+    const filtered = trips.filter(x => x.id !== id);
+    saveSandboxState('trips', filtered);
+    return true;
+  },
+
+  async deleteMaintenanceLog(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('maintenance_logs').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete maintenance log Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
+    const filtered = logs.filter(x => x.id !== id);
+    saveSandboxState('maintenance_logs', filtered);
+    return true;
+  },
+
+  async deleteFuelLog(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('fuel_logs').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete fuel log Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
+    const filtered = logs.filter(x => x.id !== id);
+    saveSandboxState('fuel_logs', filtered);
+    return true;
+  },
+
+  async deleteExpense(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('expenses').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete expense Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const expenses = getSandboxState<Expense>('expenses', mockExpenses);
+    const filtered = expenses.filter(x => x.id !== id);
+    saveSandboxState('expenses', filtered);
+    return true;
   },
 
   // NOTIFICATIONS (generated dynamically from data state to satisfy the dynamic rule)

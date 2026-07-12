@@ -11,7 +11,7 @@ import {
   Users, 
   Navigation, 
   Wrench, 
-  DollarSign, 
+  IndianRupee, 
   BarChart3, 
   Bell, 
   ShieldAlert, 
@@ -54,7 +54,7 @@ export default function Shell({ children }: ShellProps) {
     { name: 'Driver Registry', path: '/drivers', icon: Users },
     { name: 'Trip Board', path: '/trips', icon: Navigation },
     { name: 'Maintenance', path: '/maintenance', icon: Wrench },
-    { name: 'Fuel & Expenses', path: '/fuel-expenses', icon: DollarSign },
+    { name: 'Fuel & Expenses', path: '/fuel-expenses', icon: IndianRupee },
     { name: 'Reports & ROI', path: '/reports', icon: BarChart3 },
   ];
 
@@ -153,28 +153,44 @@ export default function Shell({ children }: ShellProps) {
                 className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 rounded-xl transition-all cursor-pointer"
               >
                 <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                )}
               </button>
 
               {showNotifications && (
                 <div className="absolute right-0 mt-3 w-80 bg-[#12162B] border border-slate-800 rounded-2xl shadow-xl overflow-hidden z-30 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-4 border-b border-slate-800 bg-gradient-to-r from-blue-900/10 to-indigo-900/10 flex justify-between items-center">
                     <span className="font-semibold text-sm">Compliance Alerts</span>
-                    <span className="text-[10px] text-blue-400 font-bold px-2 py-0.5 bg-blue-500/10 rounded-full">3 Alerts</span>
+                    <span className="text-[10px] text-blue-400 font-bold px-2 py-0.5 bg-blue-500/10 rounded-full">{notifications.length} Alerts</span>
                   </div>
                   <div className="divide-y divide-slate-800/80">
-                    {notifications.map((n) => (
-                      <div key={n.id} className="p-4 hover:bg-slate-800/20 transition-colors flex gap-3">
-                        <div className="p-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 h-fit">
-                          <ShieldAlert className="h-4 w-4" />
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-500">No new alerts</div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div key={n.id} className="p-4 hover:bg-slate-800/20 transition-colors flex gap-3">
+                          <div className="p-1.5 rounded-lg bg-yellow-500/10 text-yellow-400 h-fit shrink-0">
+                            <ShieldAlert className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-300 font-medium leading-relaxed">{n.text}</p>
+                            <span className="text-[10px] text-slate-500 block mt-1">{n.time}</span>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-slate-300 font-medium leading-relaxed">{n.text}</p>
-                          <span className="text-[10px] text-slate-500 block mt-1">{n.time}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
+                  {notifications.length > 0 && (
+                    <div className="p-2 border-t border-slate-800/80 bg-[#0F1424]">
+                      <button 
+                        onClick={() => setNotifications([])}
+                        className="w-full py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

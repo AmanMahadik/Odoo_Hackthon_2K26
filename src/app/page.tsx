@@ -17,7 +17,7 @@ import {
   Calendar,
   Layers,
   Database,
-  DollarSign,
+  IndianRupee,
   PlusCircle,
   FileText,
   Activity
@@ -592,7 +592,7 @@ export default function Dashboard() {
                 <span className="text-xs text-slate-400 block font-medium">Logged fleet fuel transactions</span>
               </div>
               <div className="p-4 bg-yellow-500/10 rounded-2xl text-yellow-500">
-                <DollarSign className="h-6 w-6" />
+                <IndianRupee className="h-6 w-6" />
               </div>
             </div>
 
@@ -603,7 +603,7 @@ export default function Dashboard() {
                 <span className="text-xs text-slate-400 block font-medium">Logged workshop billing</span>
               </div>
               <div className="p-4 bg-red-500/10 rounded-2xl text-red-500">
-                <DollarSign className="h-6 w-6" />
+                <IndianRupee className="h-6 w-6" />
               </div>
             </div>
 

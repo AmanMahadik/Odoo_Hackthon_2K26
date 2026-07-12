@@ -7,6 +7,7 @@ export interface Vehicle {
   odometer: number;
   acquisition_cost: number;
   status: 'Available' | 'On Trip' | 'In Shop' | 'Retired';
+  document_url?: string;
 }
 
 export interface Driver {
@@ -20,6 +21,7 @@ export interface Driver {
   status: 'Available' | 'On Trip' | 'Off Duty' | 'Suspended';
   user_id?: string;
   user?: any;
+  document_url?: string;
 }
 
 export interface Trip {

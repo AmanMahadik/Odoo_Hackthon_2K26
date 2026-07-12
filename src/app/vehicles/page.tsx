@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle } from '@/lib/mockData';
 import { 
   Plus, 
@@ -40,7 +41,7 @@ function VehiclesContent() {
   // Document Vault State
   const [docsOpen, setDocsOpen] = useState(false);
   const [docVehicle, setDocVehicle] = useState<Vehicle | null>(null);
-  const [vehicleDocs, setVehicleDocs] = useState<{ name: string; size: string; date: string }[]>([
+  const [vehicleDocs, setVehicleDocs] = useState<{ name: string; size: string; date: string; url?: string }[]>([
     { name: 'RC_Registration_Certificate.pdf', size: '2.4 MB', date: '2026-07-01' },
     { name: 'Commercial_Fleet_Insurance.pdf', size: '4.1 MB', date: '2026-07-02' },
     { name: 'Emission_Compliance_PUC.pdf', size: '1.2 MB', date: '2026-07-03' }
@@ -52,21 +53,32 @@ function VehiclesContent() {
     setDocsOpen(true);
   };
 
-  const handleMockUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0] && docVehicle) {
       const file = e.target.files[0];
       setUploadingDoc(true);
-      setTimeout(() => {
-        setVehicleDocs(prev => [
-          ...prev,
-          { 
-            name: file.name, 
-            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`, 
-            date: new Date().toISOString().split('T')[0] 
-          }
-        ]);
+      try {
+        const ext = file.name.split('.').pop();
+        const path = `vehicles/${docVehicle.registration_number}_${Date.now()}.${ext}`;
+        const url = await db.uploadDocument(file, path);
+        if (url) {
+          // You would typically save this URL to a separate `vehicle_documents` table in DB, 
+          // but for now we display it in local state.
+          setVehicleDocs(prev => [
+            ...prev,
+            { 
+              name: file.name, 
+              size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`, 
+              date: new Date().toISOString().split('T')[0],
+              url: url
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
         setUploadingDoc(false);
-      }, 1000);
+      }
     }
   };
 
@@ -90,6 +102,8 @@ function VehiclesContent() {
       setIsOpen(true);
     }
   }, [searchParams]);
+
+  useRealtimeSync('vehicles', fetchVehicles);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +164,16 @@ function VehiclesContent() {
       fetchVehicles();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this vehicle?')) return;
+    try {
+      await db.deleteVehicle(id);
+      fetchVehicles();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error deleting vehicle.');
     }
   };
 
@@ -320,11 +344,18 @@ function VehiclesContent() {
                             <button
                               onClick={() => handleRetire(v.id)}
                               title="Retire vehicle"
-                              className="p-1.5 hover:bg-red-500/10 text-red-400 rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 hover:bg-orange-500/10 text-orange-400 rounded-lg transition-colors cursor-pointer"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <AlertCircle className="h-4 w-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteVehicle(v.id)}
+                            title="Delete vehicle"
+                            className="p-1.5 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     )}
@@ -485,13 +516,24 @@ function VehiclesContent() {
                       <span className="text-xs font-bold text-slate-200 block truncate max-w-[200px]">{doc.name}</span>
                       <span className="text-[10px] text-slate-500">{doc.size} • Uploaded: {doc.date}</span>
                     </div>
-                    <a 
-                      href="#" 
-                      onClick={(e) => { e.preventDefault(); alert(`Simulated download of file: ${doc.name}`); }}
-                      className="text-[10px] text-blue-400 font-bold hover:underline"
-                    >
-                      Download
-                    </a>
+                    {doc.url ? (
+                      <a 
+                        href={doc.url} 
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-blue-400 font-bold hover:underline"
+                      >
+                        Download
+                      </a>
+                    ) : (
+                      <a 
+                        href="#" 
+                        onClick={(e) => { e.preventDefault(); alert(`Simulated download of file: ${doc.name}`); }}
+                        className="text-[10px] text-blue-400 font-bold hover:underline"
+                      >
+                        Download
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
@@ -502,7 +544,7 @@ function VehiclesContent() {
                 <div className="relative border border-dashed border-slate-800 hover:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:bg-slate-800/10 transition-all">
                   <input
                     type="file"
-                    onChange={handleMockUpload}
+                    onChange={handleDocumentUpload}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                   <div className="text-xs text-slate-400 space-y-1">

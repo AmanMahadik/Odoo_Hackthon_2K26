@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, MaintenanceLog } from '@/lib/mockData';
 import { 
   Plus, 
   Wrench, 
   CheckCircle, 
   Clock, 
-  DollarSign, 
+  IndianRupee, 
   AlertTriangle,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 export default function MaintenancePage() {
@@ -53,6 +55,8 @@ export default function MaintenancePage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useRealtimeSync('maintenance_logs', fetchData);
 
   const handleOpenMaintenance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +119,16 @@ export default function MaintenancePage() {
       fetchData();
     } catch (err: any) {
       setCloseError(err.message || 'Error closing log.');
+    }
+  };
+
+  const handleDeleteLog = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this maintenance log?')) return;
+    try {
+      await db.deleteMaintenanceLog(id);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
     }
   };
 
@@ -190,7 +204,7 @@ export default function MaintenancePage() {
                     </td>
                     <td className="p-4 text-slate-300 max-w-xs">{log.description}</td>
                     <td className="p-4 text-slate-300 font-semibold font-mono">
-                      ${log.cost.toLocaleString()}
+                      ₹{log.cost.toLocaleString()}
                     </td>
                     <td className="p-4 text-slate-400">
                       {new Date(log.opened_at).toLocaleDateString()}
@@ -201,14 +215,23 @@ export default function MaintenancePage() {
                     <td className="p-4">{getStatusBadge(log.status)}</td>
                     {canAccess('maintenance', 'create') && (
                       <td className="p-4 text-right">
-                        {log.status === 'Open' && (
+                        <div className="flex items-center justify-end gap-2">
+                          {log.status === 'Open' && (
+                            <button
+                              onClick={() => openCloseModal(log)}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" /> Close Log
+                            </button>
+                          )}
                           <button
-                            onClick={() => openCloseModal(log)}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 ml-auto cursor-pointer"
+                            onClick={() => handleDeleteLog(log.id)}
+                            title="Delete Log"
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
                           >
-                            <CheckCircle className="h-3.5 w-3.5" /> Close Log
+                            <Trash2 className="h-4 w-4" />
                           </button>
-                        )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -274,9 +297,9 @@ export default function MaintenancePage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estimated Cost ($)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Estimated Cost (₹)</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <input
                     type="number"
                     required
@@ -334,9 +357,9 @@ export default function MaintenancePage() {
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Final Service Cost ($)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Final Service Cost (₹)</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <input
                     type="number"
                     required

@@ -16,7 +16,8 @@ import {
   X,
   Calendar,
   Star,
-  Mail
+  Mail,
+  Trash2
 } from 'lucide-react';
 
 function DriversContent() {
@@ -60,8 +61,28 @@ function DriversContent() {
   // Toast state
   const [toastMessage, setToastMessage] = useState('');
 
-  const handleSendReminder = (d: Driver) => {
-    setToastMessage(`Compliance notification sent to ${d.name} (${d.contact_number}) via Resend API wrapper.`);
+  const handleSendReminder = async (d: Driver) => {
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: 'onboarding@resend.dev', // Default resend testing address since we don't have driver emails in mock
+          subject: `Urgent: License Expiry Reminder for ${d.name}`,
+          html: `<p>Hello ${d.name},</p><p>This is a reminder that your commercial driving license (${d.license_number}) expires on <strong>${d.license_expiry_date}</strong>. Please renew it immediately to remain active.</p><p>Best,<br/>TransitOps Safety Team</p>`
+        })
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setToastMessage(result.simulated ? `Compliance notification simulated for ${d.name}` : `Compliance notification sent to ${d.name}`);
+      } else {
+        setToastMessage(`Failed to send email to ${d.name}`);
+      }
+    } catch (err) {
+      setToastMessage(`Error sending notification to ${d.name}`);
+    }
+    
     setTimeout(() => {
       setToastMessage('');
     }, 4000);
@@ -159,6 +180,17 @@ function DriversContent() {
       fetchDrivers();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteDriver = async (d: Driver) => {
+    if (!confirm(`Are you sure you want to delete driver ${d.name}? This action cannot be undone.`)) return;
+    try {
+      await db.deleteDriver(d.id);
+      fetchDrivers();
+      setToastMessage(`${d.name} has been deleted.`);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error deleting driver.');
     }
   };
 
@@ -353,6 +385,13 @@ function DriversContent() {
                             }`}
                           >
                             {d.status === 'Suspended' ? <Check className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDriver(d)}
+                            title="Delete Driver"
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

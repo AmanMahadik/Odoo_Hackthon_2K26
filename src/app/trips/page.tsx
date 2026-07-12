@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, Driver, Trip } from '@/lib/mockData';
 import { 
   Plus, 
@@ -15,7 +16,8 @@ import {
   AlertTriangle,
   ArrowRight,
   TrendingUp,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 function TripsContent() {
@@ -62,6 +64,8 @@ function TripsContent() {
       setLoading(false);
     }
   };
+
+  useRealtimeSync('trips', fetchData);
 
   useEffect(() => {
     fetchData();
@@ -214,6 +218,16 @@ function TripsContent() {
     }
   };
 
+  const handleDeleteTrip = async (t: Trip) => {
+    if (!confirm('Are you sure you want to permanently delete this trip log?')) return;
+    try {
+      await db.deleteTrip(t.id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Divide into board columns
   const getTripsByStatus = (status: Trip['status']) => {
     return trips.filter(t => t.status === status);
@@ -359,6 +373,13 @@ function TripsContent() {
                                 </button>
                               </>
                             )}
+                            <button
+                              onClick={() => handleDeleteTrip(t)}
+                              title="Delete Trip"
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         )}
                       </div>

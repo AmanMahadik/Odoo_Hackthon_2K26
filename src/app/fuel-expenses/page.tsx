@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, FuelLog, Expense } from '@/lib/mockData';
 import { 
   Plus, 
@@ -11,7 +12,8 @@ import {
   Receipt,
   FileText,
   AlertTriangle,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 
 export default function FuelExpensesPage() {
@@ -60,6 +62,9 @@ export default function FuelExpensesPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useRealtimeSync('fuel_logs', fetchData);
+  useRealtimeSync('expenses', fetchData);
 
   const handleCreateFuelLog = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +123,26 @@ export default function FuelExpensesPage() {
     }
   };
 
+  const handleDeleteFuelLog = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this fuel log?')) return;
+    try {
+      await db.deleteFuelLog(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this expense?')) return;
+    try {
+      await db.deleteExpense(id);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Calculate totals
   const totalFuelCost = fuelLogs.reduce((sum, log) => sum + log.cost, 0);
   const totalExpenseCost = expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -156,7 +181,7 @@ export default function FuelExpensesPage() {
         <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Cumulative Fuel Expenses</span>
-            <span className="text-2xl font-black text-white">${totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-black text-white">₹{totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             <p className="text-[10px] text-slate-500">From {fuelLogs.length} logs recorded</p>
           </div>
           <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400">
@@ -167,7 +192,7 @@ export default function FuelExpensesPage() {
         <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Cumulative General Expenses</span>
-            <span className="text-2xl font-black text-white">${totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-black text-white">₹{totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             <p className="text-[10px] text-slate-500">Tolls, service charges, repairs</p>
           </div>
           <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
@@ -214,6 +239,7 @@ export default function FuelExpensesPage() {
                   <th className="p-4">Total Cost</th>
                   <th className="p-4">Avg Rate</th>
                   <th className="p-4">Source Link</th>
+                  {canAccess('expenses', 'create') && <th className="p-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
@@ -224,8 +250,8 @@ export default function FuelExpensesPage() {
                     </td>
                     <td className="p-4 text-slate-400">{log.log_date}</td>
                     <td className="p-4 text-slate-300 font-semibold font-mono">{log.liters} L</td>
-                    <td className="p-4 text-slate-300 font-bold font-mono">${log.cost}</td>
-                    <td className="p-4 text-slate-400 font-mono">${(log.cost / log.liters).toFixed(2)}/L</td>
+                    <td className="p-4 text-slate-300 font-bold font-mono">₹{log.cost}</td>
+                    <td className="p-4 text-slate-400 font-mono">₹{(log.cost / log.liters).toFixed(2)}/L</td>
                     <td className="p-4">
                       {log.trip_id ? (
                         <span className="text-[10px] text-blue-400 font-bold bg-blue-500/10 px-2 py-0.5 rounded-full">
@@ -235,6 +261,17 @@ export default function FuelExpensesPage() {
                         <span className="text-[10px] text-slate-500 italic">Manual Log</span>
                       )}
                     </td>
+                    {canAccess('expenses', 'create') && (
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => handleDeleteFuelLog(log.id)}
+                          title="Delete Fuel Log"
+                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -257,6 +294,7 @@ export default function FuelExpensesPage() {
                   <th className="p-4">Type</th>
                   <th className="p-4">Description</th>
                   <th className="p-4">Amount</th>
+                  {canAccess('expenses', 'create') && <th className="p-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
@@ -276,7 +314,18 @@ export default function FuelExpensesPage() {
                       </span>
                     </td>
                     <td className="p-4 text-slate-300">{exp.description || 'General fee charge'}</td>
-                    <td className="p-4 text-slate-300 font-bold font-mono">${exp.amount}</td>
+                    <td className="p-4 text-slate-300 font-bold font-mono">₹{exp.amount}</td>
+                    {canAccess('expenses', 'create') && (
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => handleDeleteExpense(exp.id)}
+                          title="Delete Expense"
+                          className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -333,7 +382,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Total Cost ($)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Total Cost (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -426,7 +475,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Amount ($)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Amount (₹)</label>
                   <input
                     type="number"
                     step="0.01"
