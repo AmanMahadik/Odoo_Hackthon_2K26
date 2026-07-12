@@ -14,7 +14,8 @@ import {
   Trash2, 
   AlertCircle,
   FileText,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { LicensePlateScanner } from '@/components/ocr/LicensePlateScanner';
 import { Button } from '@/components/ui/button';
@@ -160,7 +161,7 @@ function VehiclesContent() {
               />
             </div>
             
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val) => val && setStatusFilter(val)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Status Filter" />
               </SelectTrigger>
@@ -173,7 +174,7 @@ function VehiclesContent() {
               </SelectContent>
             </Select>
 
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <Select value={typeFilter} onValueChange={(val) => val && setTypeFilter(val)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Vehicle Type" />
               </SelectTrigger>

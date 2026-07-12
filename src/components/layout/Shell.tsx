@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { SignOutButton } from '@clerk/nextjs';
 import { useRole, getRoleSidebar } from '@/lib/roleContext';
 import { 
   LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, type LucideIcon
@@ -27,7 +28,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, profile, signOut } = useRole();
+  const { role, profile } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -77,8 +78,8 @@ export default function Shell({ children }: ShellProps) {
                            {item.subItems.map(sub => {
                              const SubIcon = iconMap[sub.icon] || LayoutDashboard;
                              return (
-                               <DropdownMenuItem key={sub.path} asChild className="rounded-lg">
-                                 <Link href={sub.path} className="flex items-center gap-2 cursor-pointer w-full">
+                               <DropdownMenuItem key={sub.path} className="rounded-lg p-0">
+                                 <Link href={sub.path} className="flex items-center gap-2 cursor-pointer w-full px-2 py-1.5">
                                    <SubIcon className="h-4 w-4 text-muted-foreground" />
                                    {sub.name}
                                  </Link>
@@ -143,14 +144,12 @@ export default function Shell({ children }: ShellProps) {
 
               {/* Profile / Settings Dialog Trigger */}
               <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 flex items-center justify-center hover:bg-muted transition-colors outline-none cursor-pointer">
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                        {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
+                <DialogTrigger className="relative h-8 w-8 rounded-full p-0 flex items-center justify-center hover:bg-muted transition-colors outline-none cursor-pointer">
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                      {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
+                    </AvatarFallback>
+                  </Avatar>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px]">
                   <DialogHeader>
@@ -180,10 +179,12 @@ export default function Shell({ children }: ShellProps) {
                           </div>
                         </div>
                         <Separator />
-                        <Button variant="destructive" onClick={signOut} className="w-full">
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Sign Out
-                        </Button>
+                        <SignOutButton>
+                          <Button variant="destructive" className="w-full">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Sign Out
+                          </Button>
+                        </SignOutButton>
                       </div>
                     </TabsContent>
                     <TabsContent value="verification" className="p-4 border rounded-md mt-4">

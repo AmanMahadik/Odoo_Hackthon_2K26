@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, RadialBarChart, RadialBar, PolarAngleAxis, Cell } from 'recharts';
 import { mockDrivers, mockVehicles } from '@/lib/mockData';
 import { ShieldCheck, ShieldAlert, AlertTriangle, Users, FileWarning, Eye } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -111,7 +111,7 @@ export default function SafetyCommandPage() {
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {scoreDistribution.map((entry, index) => (
-                      <cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>

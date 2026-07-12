@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Camera, CheckCircle2, XCircle, AlertTriangle, Loader2, Upload } from 'lucide-react';
 import { ocrService, registryService } from '@/lib/mockServices';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -60,11 +60,9 @@ export function LicensePlateScanner({ onAutoFill }: LicensePlateScannerProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" type="button" className="gap-2">
-          <Camera className="h-4 w-4" />
-          Scan Plate
-        </Button>
+      <DialogTrigger className={buttonVariants({ variant: "outline", className: "gap-2" })}>
+        <Camera className="h-4 w-4" />
+        Scan Plate
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

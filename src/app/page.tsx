@@ -18,11 +18,11 @@ import {
   Monitor
 } from 'lucide-react';
 import AIPredictionCard from '@/components/ai/AIPredictionCard';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { BarChart, Bar, CartesianGrid, XAxis, YAxis, Cell } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 
 // Dynamically import map with no SSR since Leaflet needs window
@@ -193,14 +193,12 @@ export default function Dashboard() {
                 <LiveFleetMap compact />
               </div>
               <div className="mt-6 flex gap-4">
-                <Button className="flex-1" asChild>
-                  <Link href="/trips">
-                    Go to Trip Board <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-                <Button variant="outline" className="flex-1" asChild>
-                  <Link href="/reports">Analyze ROI Metrics</Link>
-                </Button>
+                <Link href="/trips" className={`flex-1 ${buttonVariants({ variant: "default" })}`}>
+                  Go to Trip Board <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+                <Link href="/reports" className={`flex-1 ${buttonVariants({ variant: "outline" })}`}>
+                  Analyze ROI Metrics
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -231,7 +229,7 @@ export default function Dashboard() {
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                       {scoreDistribution.map((entry, index) => (
-                        <cell key={`cell-${index}`} fill={entry.fill} />
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -250,15 +248,9 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-bold">Operations Panel</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/vehicles?add=true">Add Vehicle</Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/drivers?add=true">Add Driver</Link>
-              </Button>
-              <Button variant="default" size="sm" className="col-span-2" asChild>
-                <Link href="/trips?new=true">Dispatch New Route</Link>
-              </Button>
+              <Link href="/vehicles?add=true" className={buttonVariants({ variant: "outline", size: "sm" })}>Add Vehicle</Link>
+              <Link href="/drivers?add=true" className={buttonVariants({ variant: "outline", size: "sm" })}>Add Driver</Link>
+              <Link href="/trips?new=true" className={`col-span-2 ${buttonVariants({ variant: "default", size: "sm" })}`}>Dispatch New Route</Link>
             </CardContent>
           </Card>
 

@@ -85,7 +85,7 @@ export default function CostImpactChart({ data }: CostImpactChartProps) {
               color: '#f1f5f9',
             }}
             labelStyle={{ color: '#94a3b8', fontWeight: 600 }}
-            formatter={(value: number, name: string) => [
+            formatter={(value: any, name: any) => [
               `$${value.toLocaleString()}`,
               name.charAt(0).toUpperCase() + name.slice(1),
             ]}

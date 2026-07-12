@@ -130,7 +130,7 @@ export default function FuelPriceWidget() {
                 color: '#f1f5f9',
               }}
               labelStyle={{ color: '#94a3b8' }}
-              formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
+              formatter={(value: any, name: any) => [`$${value.toFixed(2)}`, 'Price']}
             />
             <Line
               type="monotone"
