@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, getRoleSidebar } from '@/lib/roleContext';
 import LiveOpsMarquee from '@/components/layout/LiveOpsMarquee';
+import NotificationDrawer from '@/components/layout/NotificationDrawer';
 import { 
   LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, Sparkles, Activity, type LucideIcon
 } from 'lucide-react';
@@ -32,15 +33,14 @@ export default function Shell({ children }: ShellProps) {
   const { role, profile, signOut } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Notifications feed (would be fetched from API in real implementation)
-  const notifications: any[] = [];
 
   const sidebarItems = getRoleSidebar(role);
 
@@ -116,37 +116,20 @@ export default function Shell({ children }: ShellProps) {
             </nav>
 
             <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0 ml-auto z-10">
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger className="relative flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuGroup>
-                    <DropdownMenuLabel className="flex justify-between items-center">
-                      Alerts
-                      <Badge variant="secondary">{notifications.length}</Badge>
-                    </DropdownMenuLabel>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  {notifications.length === 0 ? (
-                    <DropdownMenuItem className="p-4 text-center text-sm text-muted-foreground">
-                      No new alerts
-                    </DropdownMenuItem>
-                  ) : (
-                    notifications.map(n => (
-                      <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-1 p-3 cursor-default">
-                        <div className="flex items-start gap-2">
-                          <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                          <span className="text-sm">{n.text}</span>
-                        </div>
-                        <span className="text-[10px] text-muted-foreground ml-6">{n.time}</span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Notifications — opens right-slide panel */}
+              <button
+                type="button"
+                onClick={() => setNotifOpen(true)}
+                className="relative flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none"
+                aria-label="Open notifications"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-medium flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
 
               <Separator orientation="vertical" className="h-5 hidden md:block" />
 
@@ -310,6 +293,12 @@ export default function Shell({ children }: ShellProps) {
 
       {/* Continuous live state ticker strip under title nav */}
       <LiveOpsMarquee />
+
+      <NotificationDrawer
+        open={notifOpen}
+        onOpenChange={setNotifOpen}
+        onCountChange={setUnreadCount}
+      />
 
       {/* Mobile Navigation Dropdown */}
       {mobileMenuOpen && (
