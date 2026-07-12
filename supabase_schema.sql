@@ -3,9 +3,9 @@
 -- Paste this into the Supabase SQL Editor
 -- ============================================
 
--- 1. Create Profiles table (Linked to Auth.Users)
+-- 1. Create Profiles table (Clerk Auth IDs are text)
 create table if not exists public.profiles (
-  id uuid references auth.users on delete cascade primary key,
+  id text primary key,
   full_name text not null,
   role text not null check (role in ('Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst')),
   email text,
@@ -37,7 +37,7 @@ create table if not exists public.drivers (
   contact_number text,
   safety_score numeric default 100 not null,
   status text default 'Available' not null check (status in ('Available', 'On Trip', 'Off Duty', 'Suspended')),
-  user_id uuid references public.profiles(id) on delete set null,
+  user_id text references public.profiles(id) on delete set null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -95,7 +95,7 @@ create table if not exists public.expenses (
 -- 8. Create Notifications table
 create table if not exists public.notifications (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id text references public.profiles(id) on delete cascade not null,
   type text not null,
   message text not null,
   read_status boolean default false not null,
@@ -117,25 +117,7 @@ create table if not exists public.documents (
 -- ============================================
 
 -- A. Auto Profile Creation on auth.users Sign Up
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, full_name, role, email)
-  values (
-    new.id, 
-    coalesce(new.raw_user_meta_data->>'full_name', 'System User'), 
-    coalesce(new.raw_user_meta_data->>'role', 'Fleet Manager'),
-    new.email
-  );
-  return new;
-end;
-$$ language plpgsql security definer;
-
--- Recreate trigger if exists
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+-- (Removed because we are using Clerk Auth, which handles users externally)
 
 -- B. Trip Status Transition Engine
 create or replace function public.process_trip_status_transition()
@@ -253,8 +235,8 @@ $$ language sql security definer;
 
 -- Profiles policies
 create policy "Allow authenticated select profiles" on public.profiles for select using (auth.role() = 'authenticated');
-create policy "Allow profile owner insert" on public.profiles for insert with check (auth.uid() = id);
-create policy "Allow profile owner update" on public.profiles for update using (auth.uid() = id);
+create policy "Allow profile owner insert" on public.profiles for insert with check (auth.uid()::text = id);
+create policy "Allow profile owner update" on public.profiles for update using (auth.uid()::text = id);
 
 -- Vehicles policies
 create policy "Allow auth read vehicles" on public.vehicles for select using (auth.role() = 'authenticated');
@@ -281,9 +263,9 @@ create policy "Allow auth read expenses" on public.expenses for select using (au
 create policy "Allow managers modify expenses" on public.expenses for all using (public.get_auth_role() IN ('Fleet Manager', 'Financial Analyst')) with check (public.get_auth_role() IN ('Fleet Manager', 'Financial Analyst'));
 
 -- Notifications policies
-create policy "Allow owner read notifications" on public.notifications for select using (user_id = auth.uid());
+create policy "Allow owner read notifications" on public.notifications for select using (user_id = auth.uid()::text);
 create policy "Allow auth insert notifications" on public.notifications for insert with check (auth.role() = 'authenticated');
-create policy "Allow owner update notifications" on public.notifications for update using (user_id = auth.uid());
+create policy "Allow owner update notifications" on public.notifications for update using (user_id = auth.uid()::text);
 
 -- Documents policies
 create policy "Allow auth read documents" on public.documents for select using (auth.role() = 'authenticated');

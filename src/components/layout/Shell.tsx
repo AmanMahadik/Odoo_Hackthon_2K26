@@ -48,7 +48,7 @@ export default function Shell({ children }: ShellProps) {
     || pathname.split('/').pop()?.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') 
     || 'Dashboard';
 
-  if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up')) {
+  if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname === '/onboarding') {
     return <>{children}</>;
   }
 
