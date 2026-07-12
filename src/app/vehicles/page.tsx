@@ -137,6 +137,16 @@ function VehiclesContent() {
     }
 
     try {
+      const ocr_snapshot = {
+        registration_number: regNum.trim().toUpperCase(),
+        model: model.trim(),
+        type,
+        max_load_capacity: String(capacity),
+        odometer: String(odometer),
+        acquisition_cost: String(cost),
+        ocr_validated: isOCRValidated ? 'yes' : 'no',
+      };
+
       const payload = {
         registration_number: regNum.trim().toUpperCase(),
         model: model.trim(),
@@ -146,14 +156,16 @@ function VehiclesContent() {
         acquisition_cost: Number(cost),
         status,
         registration_doc_url: regDocUrl || undefined,
+        ocr_snapshot,
       };
 
       if (editingId) {
         await db.updateVehicle(editingId, payload);
         if (status === 'Pending' && regDocUrl) {
-          await db.submitVehicleRegistration(editingId, regDocUrl);
+          await db.submitVehicleRegistration(editingId, regDocUrl, ocr_snapshot);
         }
       } else {
+        // New vehicles stay pending/not active until fleet manager accepts
         await db.createVehicle({
           ...payload,
           status: 'Pending',

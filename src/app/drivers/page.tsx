@@ -121,6 +121,15 @@ export default function DriversPage() {
     }
 
     try {
+      const ocr_snapshot = {
+        name: name.trim(),
+        license_number: licenseNum.trim().toUpperCase(),
+        license_category: licenseType,
+        license_expiry_date: expiry,
+        contact_number: contact,
+        ocr_validated: isOCRValidated ? 'yes' : 'no',
+      };
+
       const payload = {
         name: name.trim(),
         license_number: licenseNum.trim().toUpperCase(),
@@ -130,19 +139,17 @@ export default function DriversPage() {
         status,
         safety_score: Number(safetyScore) || 100,
         license_doc_url: licenseDocUrl || undefined,
+        ocr_snapshot,
       };
 
       if (editingId) {
         await db.updateDriver(editingId, payload);
         // Re-submit for approval if still inactive and has doc
-        if (
-          (status === 'Inactive' || status === 'Pending') &&
-          licenseDocUrl
-        ) {
-          await db.submitDriverLicense(editingId, licenseDocUrl);
+        if ((status === 'Inactive' || status === 'Pending') && licenseDocUrl) {
+          await db.submitDriverLicense(editingId, licenseDocUrl, ocr_snapshot);
         }
       } else {
-        // New drivers: Inactive/Pending until fleet manager accepts
+        // New drivers: not active until fleet manager accepts (Pending with doc)
         await db.createDriver({
           ...payload,
           status: 'Pending',

@@ -20,6 +20,8 @@ export interface Vehicle {
   /** Registration certificate / plate image (blob or storage URL) */
   registration_doc_url?: string;
   approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
+  /** OCR / form snapshot for fleet manager review */
+  ocr_snapshot?: Record<string, string>;
 }
 
 export interface Driver {
@@ -37,6 +39,8 @@ export interface Driver {
   /** License document image (blob or storage URL) */
   license_doc_url?: string;
   approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
+  /** OCR / form snapshot for fleet manager review */
+  ocr_snapshot?: Record<string, string>;
 }
 
 /** Inbox items for the notification drawer (approvals, dispatch, ops) */
@@ -59,6 +63,7 @@ export interface AppNotification {
   entity_id?: string;
   entity_type?: 'driver' | 'vehicle' | 'trip';
   action_status?: 'open' | 'approved' | 'rejected' | 'info';
+  /** Flexible payload — image URL + OCR fields for review dialog */
   meta?: Record<string, string | number | undefined>;
 }
 

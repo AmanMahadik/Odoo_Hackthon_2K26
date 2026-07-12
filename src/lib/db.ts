@@ -112,11 +112,40 @@ export const db = {
   },
 
   async createVehicle(v: Omit<Vehicle, 'id'>): Promise<Vehicle> {
-    // New vehicles always enter Pending until registration is approved
+    // New vehicles always Pending (not active) until fleet manager accepts registration
+    const ocr = v.ocr_snapshot || {
+      registration_number: v.registration_number,
+      model: v.model,
+      type: v.type,
+      max_load_capacity: String(v.max_load_capacity),
+      odometer: String(v.odometer),
+    };
     const record: Omit<Vehicle, 'id'> = {
       ...v,
       status: 'Pending',
-      approval_status: v.registration_doc_url ? 'pending' : 'pending',
+      approval_status: 'pending',
+      ocr_snapshot: ocr,
+    };
+
+    const notifyVehicle = (vehicle: Vehicle) => {
+      pushInboxNotification({
+        type: 'vehicle_approval',
+        title: 'Vehicle registration review',
+        text: `${vehicle.registration_number} registration submitted — review image & OCR data.`,
+        entity_id: vehicle.id,
+        entity_type: 'vehicle',
+        action_status: 'open',
+        meta: {
+          doc: vehicle.registration_doc_url,
+          registration: vehicle.registration_number,
+          model: vehicle.model,
+          type: vehicle.type,
+          capacity: String(vehicle.max_load_capacity),
+          odometer: String(vehicle.odometer),
+          acquisition_cost: String(vehicle.acquisition_cost),
+          ...ocr,
+        },
+      });
     };
 
     if (isLiveMode) {
@@ -124,40 +153,18 @@ export const db = {
         const { data, error } = await supabase.from('vehicles').insert([record]).select().single();
         if (error) throw error;
         if (data) {
-          pushInboxNotification({
-            type: 'vehicle_approval',
-            title: 'Vehicle registration approval',
-            text: `${data.registration_number} (${data.model}) awaits fleet manager approval.`,
-            entity_id: data.id,
-            entity_type: 'vehicle',
-            action_status: 'open',
-            meta: { registration: data.registration_number, model: data.model },
-          });
+          notifyVehicle(data);
           return data;
         }
       } catch (err: any) {
         console.error("Create vehicle Supabase error:", err.message || err);
-        // fall through to sandbox
       }
     }
-    // Sandbox
     const vehicles = getSandboxState<Vehicle>('vehicles', mockVehicles);
     const newVehicle: Vehicle = { ...record, id: `v_${Date.now()}` };
     vehicles.push(newVehicle);
     saveSandboxState('vehicles', vehicles);
-    pushInboxNotification({
-      type: 'vehicle_approval',
-      title: 'Vehicle registration approval',
-      text: `${newVehicle.registration_number} (${newVehicle.model}) awaits fleet manager approval.`,
-      entity_id: newVehicle.id,
-      entity_type: 'vehicle',
-      action_status: 'open',
-      meta: {
-        registration: newVehicle.registration_number,
-        model: newVehicle.model,
-        doc: newVehicle.registration_doc_url,
-      },
-    });
+    notifyVehicle(newVehicle);
     return newVehicle;
   },
 
@@ -194,13 +201,42 @@ export const db = {
   },
 
   async createDriver(d: Omit<Driver, 'id'>): Promise<Driver> {
-    // New drivers start Inactive (not active) until docs + fleet manager approval
+    // New drivers: Inactive if no license image; Pending once image is submitted (still not active)
     const hasDoc = Boolean(d.license_doc_url);
+    const ocr = d.ocr_snapshot || {
+      name: d.name,
+      license_number: d.license_number,
+      license_category: d.license_category,
+      license_expiry_date: d.license_expiry_date,
+      contact_number: d.contact_number,
+    };
     const record: Omit<Driver, 'id'> = {
       ...d,
       status: hasDoc ? 'Pending' : 'Inactive',
       approval_status: hasDoc ? 'pending' : 'none',
       safety_score: d.safety_score ?? 100,
+      ocr_snapshot: ocr,
+    };
+
+    const notifyDriver = (driver: Driver) => {
+      if (!driver.license_doc_url) return;
+      pushInboxNotification({
+        type: 'driver_approval',
+        title: 'Driver activation review',
+        text: `${driver.name} is not active — review license image & OCR to activate.`,
+        entity_id: driver.id,
+        entity_type: 'driver',
+        action_status: 'open',
+        meta: {
+          doc: driver.license_doc_url,
+          name: driver.name,
+          license_number: driver.license_number,
+          license_category: driver.license_category,
+          license_expiry_date: driver.license_expiry_date,
+          contact_number: driver.contact_number,
+          ...ocr,
+        },
+      });
     };
 
     if (isLiveMode) {
@@ -208,17 +244,7 @@ export const db = {
         const { data, error } = await supabase.from('drivers').insert([record]).select().single();
         if (error) throw error;
         if (data) {
-          if (hasDoc) {
-            pushInboxNotification({
-              type: 'driver_approval',
-              title: 'Driver status approval',
-              text: `${data.name} submitted a license for activation.`,
-              entity_id: data.id,
-              entity_type: 'driver',
-              action_status: 'open',
-              meta: { name: data.name, license: data.license_number },
-            });
-          }
+          notifyDriver(data);
           return data;
         }
       } catch (err: any) {
@@ -229,21 +255,7 @@ export const db = {
     const newDriver: Driver = { ...record, id: `d_${Date.now()}` };
     drivers.push(newDriver);
     saveSandboxState('drivers', drivers);
-    if (hasDoc) {
-      pushInboxNotification({
-        type: 'driver_approval',
-        title: 'Driver status approval',
-        text: `${newDriver.name} submitted a license for activation.`,
-        entity_id: newDriver.id,
-        entity_type: 'driver',
-        action_status: 'open',
-        meta: {
-          name: newDriver.name,
-          license: newDriver.license_number,
-          doc: newDriver.license_doc_url,
-        },
-      });
-    }
+    notifyDriver(newDriver);
     return newDriver;
   },
 
@@ -805,7 +817,15 @@ export const db = {
               entity_id: d.id,
               entity_type: 'driver',
               action_status: 'open',
-              meta: { name: d.name, license: d.license_number, doc: d.license_doc_url },
+              meta: {
+                name: d.name,
+                license_number: d.license_number,
+                license_category: d.license_category,
+                license_expiry_date: d.license_expiry_date,
+                contact_number: d.contact_number,
+                doc: d.license_doc_url,
+                ...(d.ocr_snapshot || {}),
+              },
             });
           }
         }
@@ -852,7 +872,16 @@ export const db = {
               entity_id: v.id,
               entity_type: 'vehicle',
               action_status: 'open',
-              meta: { registration: v.registration_number, model: v.model, doc: v.registration_doc_url },
+              meta: {
+                registration: v.registration_number,
+                registration_number: v.registration_number,
+                model: v.model,
+                type: v.type,
+                capacity: String(v.max_load_capacity),
+                odometer: String(v.odometer),
+                doc: v.registration_doc_url,
+                ...(v.ocr_snapshot || {}),
+              },
             });
           }
         }
@@ -1001,44 +1030,92 @@ export const db = {
     }
   },
 
-  async submitDriverLicense(driverId: string, licenseDocUrl: string): Promise<Driver> {
+  async submitDriverLicense(
+    driverId: string,
+    licenseDocUrl: string,
+    ocrSnapshot?: Record<string, string>
+  ): Promise<Driver> {
+    const current = (await this.getDrivers()).find((d) => d.id === driverId);
+    const ocr = ocrSnapshot ||
+      current?.ocr_snapshot || {
+        name: current?.name || '',
+        license_number: current?.license_number || '',
+        license_category: current?.license_category || '',
+        license_expiry_date: current?.license_expiry_date || '',
+        contact_number: current?.contact_number || '',
+      };
     const updated = await this.updateDriver(driverId, {
       license_doc_url: licenseDocUrl,
       status: 'Pending',
       approval_status: 'pending',
+      ocr_snapshot: ocr,
     });
     pushInboxNotification({
       type: 'driver_approval',
-      title: 'Driver status approval',
-      text: `${updated.name} uploaded a license and is pending activation.`,
+      title: 'Driver activation review',
+      text: `${updated.name} uploaded a license — review image & OCR to activate.`,
       entity_id: updated.id,
       entity_type: 'driver',
       action_status: 'open',
-      meta: { name: updated.name, license: updated.license_number, doc: licenseDocUrl },
+      meta: {
+        doc: licenseDocUrl,
+        name: updated.name,
+        license_number: updated.license_number,
+        license_category: updated.license_category,
+        license_expiry_date: updated.license_expiry_date,
+        contact_number: updated.contact_number,
+        ...ocr,
+      },
     });
     return updated;
   },
 
-  async submitVehicleRegistration(vehicleId: string, registrationDocUrl: string): Promise<Vehicle> {
+  async submitVehicleRegistration(
+    vehicleId: string,
+    registrationDocUrl: string,
+    ocrSnapshot?: Record<string, string>
+  ): Promise<Vehicle> {
+    const current = (await this.getVehicles()).find((v) => v.id === vehicleId);
+    const ocr = ocrSnapshot ||
+      current?.ocr_snapshot || {
+        registration_number: current?.registration_number || '',
+        model: current?.model || '',
+        type: current?.type || '',
+      };
     const updated = await this.updateVehicle(vehicleId, {
       registration_doc_url: registrationDocUrl,
       status: 'Pending',
       approval_status: 'pending',
+      ocr_snapshot: ocr,
     });
     pushInboxNotification({
       type: 'vehicle_approval',
-      title: 'Vehicle registration approval',
-      text: `${updated.registration_number} registration document submitted for approval.`,
+      title: 'Vehicle registration review',
+      text: `${updated.registration_number} registration uploaded — review image & OCR.`,
       entity_id: updated.id,
       entity_type: 'vehicle',
       action_status: 'open',
       meta: {
+        doc: registrationDocUrl,
         registration: updated.registration_number,
         model: updated.model,
-        doc: registrationDocUrl,
+        type: updated.type,
+        capacity: String(updated.max_load_capacity),
+        odometer: String(updated.odometer),
+        ...ocr,
       },
     });
     return updated;
+  },
+
+  async getDriverById(id: string): Promise<Driver | null> {
+    const list = await this.getDrivers();
+    return list.find((d) => d.id === id) || null;
+  },
+
+  async getVehicleById(id: string): Promise<Vehicle | null> {
+    const list = await this.getVehicles();
+    return list.find((v) => v.id === id) || null;
   },
 
   // GPS POSITIONS — lat/lng snapshots persisted in sandbox DB
