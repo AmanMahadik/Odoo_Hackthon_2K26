@@ -8,11 +8,12 @@ import {
   Download, 
   TrendingUp, 
   Percent, 
-  DollarSign, 
+  IndianRupee, 
   Sliders, 
   ChevronRight,
   RefreshCw
 } from 'lucide-react';
+import { exportToPDF, exportToCSV } from '@/lib/exportUtils';
 
 interface VehicleROIReport {
   vehicleId: string;
@@ -139,22 +140,33 @@ export default function ReportsPage() {
   const totalFleetRevenue = simReportData.reduce((sum, i) => sum + i.totalRevenues, 0);
   const avgFleetROI = simReportData.length > 0 ? simReportData.reduce((sum, i) => sum + i.roiPercentage, 0) / simReportData.length : 0;
 
-  // Export to CSV
   const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'Registration Number,Model,Acquisition Cost,Fuel Cost,Maintenance Cost,Other Expenses,Total Running Costs,Total Revenues,Net Profit,ROI %\n';
+    const csvData = simReportData.map(item => ({
+      'Registration Number': item.registrationNumber,
+      'Model': item.model,
+      'Acquisition Cost': item.acquisitionCost,
+      'Fuel Cost': item.fuelCost.toFixed(2),
+      'Maintenance Cost': item.maintenanceCost.toFixed(2),
+      'Other Expenses': item.otherExpenses.toFixed(2),
+      'Total Running Costs': item.totalCosts.toFixed(2),
+      'Total Revenues': item.totalRevenues.toFixed(2),
+      'Net Profit': item.netProfit.toFixed(2),
+      'ROI %': `${item.roiPercentage.toFixed(2)}%`
+    }));
+    exportToCSV(`TransitOps_ROI_Report_${new Date().toISOString().split('T')[0]}.csv`, csvData);
+  };
 
-    simReportData.forEach(item => {
-      csvContent += `"${item.registrationNumber}","${item.model}",${item.acquisitionCost},${item.fuelCost.toFixed(2)},${item.maintenanceCost.toFixed(2)},${item.otherExpenses.toFixed(2)},${item.totalCosts.toFixed(2)},${item.totalRevenues.toFixed(2)},${item.netProfit.toFixed(2)},${item.roiPercentage.toFixed(2)}%\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `TransitOps_ROI_Report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportPDF = () => {
+    const totals = {
+      netProfit: totalFleetProfit,
+      costs: totalFleetCosts,
+      revenues: totalFleetRevenue,
+      roi: avgFleetROI,
+      fuel: simReportData.reduce((sum, i) => sum + i.fuelCost, 0),
+      maintenance: simReportData.reduce((sum, i) => sum + i.maintenanceCost, 0),
+      other: simReportData.reduce((sum, i) => sum + i.otherExpenses, 0)
+    };
+    exportToPDF(simReportData, totals);
   };
 
   return (
@@ -169,7 +181,7 @@ export default function ReportsPage() {
         {canAccess('reports', 'export') && (
           <div className="flex gap-3 print:hidden">
             <button
-              onClick={() => window.print()}
+              onClick={handleExportPDF}
               className="px-4 py-2.5 bg-[#171d33] border border-slate-700/80 hover:bg-slate-850 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
             >
               <Download className="h-4 w-4 text-purple-400" /> Export PDF

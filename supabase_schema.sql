@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   full_name text not null,
   role text not null check (role in ('Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst')),
+  email text,
   contact_number text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -119,11 +120,12 @@ create table if not exists public.documents (
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, role)
+  insert into public.profiles (id, full_name, role, email)
   values (
     new.id, 
     coalesce(new.raw_user_meta_data->>'full_name', 'System User'), 
-    coalesce(new.raw_user_meta_data->>'role', 'Fleet Manager')
+    coalesce(new.raw_user_meta_data->>'role', 'Fleet Manager'),
+    new.email
   );
   return new;
 end;
@@ -243,49 +245,51 @@ alter table public.expenses enable row level security;
 alter table public.notifications enable row level security;
 alter table public.documents enable row level security;
 
--- Open policies for hackathon client demo operations
-create policy "Enable read for all" on public.profiles for select using (true);
-create policy "Enable all for all" on public.profiles for all using (true) with check (true);
+-- Helper function to fetch authenticated user's role
+create or replace function public.get_auth_role()
+returns text as $$
+  select role from public.profiles where id = auth.uid();
+$$ language sql security definer;
 
-create policy "Enable read for all" on public.vehicles for select using (true);
-create policy "Enable all for all" on public.vehicles for all using (true) with check (true);
+-- Profiles policies
+create policy "Allow authenticated select profiles" on public.profiles for select using (auth.role() = 'authenticated');
+create policy "Allow profile owner insert" on public.profiles for insert with check (auth.uid() = id);
+create policy "Allow profile owner update" on public.profiles for update using (auth.uid() = id);
 
-create policy "Enable read for all" on public.drivers for select using (true);
-create policy "Enable all for all" on public.drivers for all using (true) with check (true);
+-- Vehicles policies
+create policy "Allow auth read vehicles" on public.vehicles for select using (auth.role() = 'authenticated');
+create policy "Allow Fleet Manager modify vehicles" on public.vehicles for all using (public.get_auth_role() = 'Fleet Manager') with check (public.get_auth_role() = 'Fleet Manager');
 
-create policy "Enable read for all" on public.trips for select using (true);
-create policy "Enable all for all" on public.trips for all using (true) with check (true);
+-- Drivers policies
+create policy "Allow auth read drivers" on public.drivers for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify drivers" on public.drivers for all using (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer')) with check (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer'));
 
-create policy "Enable read for all" on public.maintenance_logs for select using (true);
-create policy "Enable all for all" on public.maintenance_logs for all using (true) with check (true);
+-- Trips policies
+create policy "Allow auth read trips" on public.trips for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify trips" on public.trips for all using (public.get_auth_role() IN ('Fleet Manager', 'Dispatcher', 'Driver')) with check (public.get_auth_role() IN ('Fleet Manager', 'Dispatcher', 'Driver'));
 
-create policy "Enable read for all" on public.fuel_logs for select using (true);
-create policy "Enable all for all" on public.fuel_logs for all using (true) with check (true);
+-- Maintenance logs policies
+create policy "Allow auth read maintenance" on public.maintenance_logs for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify maintenance" on public.maintenance_logs for all using (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer')) with check (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer'));
 
-create policy "Enable read for all" on public.expenses for select using (true);
-create policy "Enable all for all" on public.expenses for all using (true) with check (true);
+-- Fuel logs policies
+create policy "Allow auth read fuel_logs" on public.fuel_logs for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify fuel_logs" on public.fuel_logs for all using (public.get_auth_role() IN ('Fleet Manager', 'Dispatcher', 'Driver', 'Financial Analyst')) with check (public.get_auth_role() IN ('Fleet Manager', 'Dispatcher', 'Driver', 'Financial Analyst'));
 
-create policy "Enable read for all" on public.notifications for select using (true);
-create policy "Enable all for all" on public.notifications for all using (true) with check (true);
+-- Expenses policies
+create policy "Allow auth read expenses" on public.expenses for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify expenses" on public.expenses for all using (public.get_auth_role() IN ('Fleet Manager', 'Financial Analyst')) with check (public.get_auth_role() IN ('Fleet Manager', 'Financial Analyst'));
 
-create policy "Enable read for all" on public.documents for select using (true);
-create policy "Enable all for all" on public.documents for all using (true) with check (true);
+-- Notifications policies
+create policy "Allow owner read notifications" on public.notifications for select using (user_id = auth.uid());
+create policy "Allow auth insert notifications" on public.notifications for insert with check (auth.role() = 'authenticated');
+create policy "Allow owner update notifications" on public.notifications for update using (user_id = auth.uid());
+
+-- Documents policies
+create policy "Allow auth read documents" on public.documents for select using (auth.role() = 'authenticated');
+create policy "Allow managers modify documents" on public.documents for all using (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer')) with check (public.get_auth_role() IN ('Fleet Manager', 'Safety Officer'));
 
 -- ============================================
 -- SEED DATA
 -- ============================================
-
--- Vehicles
-insert into public.vehicles (registration_number, model, type, max_load_capacity, odometer, acquisition_cost, status) values
-('VAN-05', 'Ford Transit 2022', 'Van', 1200, 12500, 35000, 'Available'),
-('TRK-12', 'Isuzu NPR 2021', 'Truck', 5000, 45000, 65000, 'Available'),
-('BIK-01', 'Honda CB500X', 'Bike', 150, 8000, 8000, 'Available'),
-('VAN-03', 'Mercedes Sprinter', 'Van', 1500, 32000, 48000, 'Available')
-on conflict (registration_number) do nothing;
-
--- Drivers
-insert into public.drivers (name, license_number, license_category, license_expiry_date, contact_number, safety_score, status) values
-('Alex Johnson', 'DL-2024-001', 'Heavy Vehicle', '2027-08-15', '+1-555-0101', 95, 'Available'),
-('Sarah Chen', 'DL-2024-002', 'Heavy Vehicle', '2026-03-20', '+1-555-0102', 88, 'Available'),
-('Mike Ross', 'DL-2023-003', 'Light Vehicle', '2028-01-10', '+1-555-0103', 72, 'Available')
-on conflict (license_number) do nothing;
+-- No initial dummy seeds are inserted. Create assets directly via the UI admin registry panels.

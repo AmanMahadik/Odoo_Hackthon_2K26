@@ -2,15 +2,19 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { db } from './db';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 
 export type Role = 'Fleet Manager' | 'Dispatcher' | 'Safety Officer' | 'Financial Analyst' | 'Driver' | 'Maintenance Technician';
 
+export type Theme = 'light' | 'dark';
+
 interface UserProfile {
   id: string;
   full_name: string;
   role: Role;
+  email?: string;
   contact_number?: string;
 }
 
@@ -22,6 +26,7 @@ interface RoleContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   canAccess: (resource: string, action: 'create' | 'read' | 'update' | 'delete' | 'dispatch' | 'export') => boolean;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -208,10 +213,21 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (user) {
+      const data = await db.updateProfile(user.id, {
+        ...updates,
+        role: profile?.role || 'Fleet Manager'
+      });
+      setProfile(data);
+      setRoleState(data.role);
+    }
+  };
+
   return (
     <RoleContext.Provider value={{ 
       role, setRole, user, profile, loading, 
-      signOut, canAccess 
+      signOut, canAccess, updateProfile 
     }}>
       {children}
     </RoleContext.Provider>

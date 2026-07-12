@@ -4,6 +4,9 @@ import {
   mockVehicles, mockDrivers, mockTrips, mockMaintenanceLogs, mockFuelLogs, mockExpenses 
 } from './mockData';
 
+// Safe helper to check if a string matches PostgreSQL UUID format
+const isUuid = (val: string): boolean => typeof val === 'string' && val.length === 36 && val.includes('-');
+
 // Safe helper to load sandbox state from localStorage or initialize
 const getSandboxState = <T>(key: string, defaultState: T[]): T[] => {
   if (typeof window === 'undefined') return defaultState;
@@ -56,6 +59,24 @@ export const db = {
   // Check active mode
   getMode: () => isLiveMode ? 'Live Database' : 'Sandbox (Offline/Unseeded DB)',
 
+  // DOCUMENTS
+  async uploadDocument(file: File, path: string): Promise<string | null> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
+        if (error) throw error;
+        
+        const { data: publicUrlData } = supabase.storage.from('documents').getPublicUrl(path);
+        return publicUrlData.publicUrl;
+      } catch (err: any) {
+        console.error("Upload document error:", err.message || err);
+        return null;
+      }
+    }
+    // Sandbox simulation: just return a local blob URL
+    return URL.createObjectURL(file);
+  },
+
   // VEHICLES
   async getVehicles(): Promise<Vehicle[]> {
     const { data } = await executeQuery<any>(
@@ -70,10 +91,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('vehicles').insert([v]).select().single();
-        if (!error && data) return data;
-        console.error("Create vehicle in Supabase error, creating locally:", error);
-      } catch (err) {
-        console.error("Create vehicle error:", err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create vehicle Supabase error:", err.message || err);
+        throw err;
       }
     }
     // Sandbox
@@ -85,12 +107,14 @@ export const db = {
   },
 
   async updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle> {
-    if (isLiveMode && !id.startsWith('v_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update vehicle Supabase error:", err.message || err);
+        throw err;
       }
     }
     // Sandbox
@@ -118,9 +142,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('drivers').insert([d]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create driver Supabase error:", err.message || err);
+        throw err;
       }
     }
     const drivers = getSandboxState<Driver>('drivers', mockDrivers);
@@ -131,12 +157,14 @@ export const db = {
   },
 
   async updateDriver(id: string, updates: Partial<Driver>): Promise<Driver> {
-    if (isLiveMode && !id.startsWith('d_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('drivers').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update driver Supabase error:", err.message || err);
+        throw err;
       }
     }
     const drivers = getSandboxState<Driver>('drivers', mockDrivers);
@@ -160,7 +188,7 @@ export const db = {
           driver:drivers(*)
         `).order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data as unknown as Trip[];
         }
       } catch (err) {
@@ -202,13 +230,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('trips').insert([t]).select().single();
-        if (!error && data) {
-          // Trigger updates status dynamically if handled via Postgres triggers, or client falls back
-          return data;
-        }
-        console.error("Create trip DB error, using sandbox:", error);
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create trip Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -236,12 +262,14 @@ export const db = {
     const trips = getSandboxState<Trip>('trips', mockTrips);
     const currentTrip = trips.find(x => x.id === id);
 
-    if (isLiveMode && !id.startsWith('t_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('trips').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update trip Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -288,7 +316,7 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').select('*, vehicle:vehicles(*)').order('opened_at', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as MaintenanceLog[];
+        if (!error && data) return data as unknown as MaintenanceLog[];
       } catch (err) {
         console.error(err);
       }
@@ -305,9 +333,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').insert([l]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create maintenance log Supabase error:", err.message || err);
+        throw err;
       }
     }
     const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
@@ -330,12 +360,14 @@ export const db = {
     const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
     const currentLog = logs.find(x => x.id === id);
 
-    if (isLiveMode && !id.startsWith('m_')) {
+    if (isLiveMode && isUuid(id)) {
       try {
         const { data, error } = await supabase.from('maintenance_logs').update(updates).eq('id', id).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update maintenance log Supabase error:", err.message || err);
+        throw err;
       }
     }
 
@@ -373,9 +405,9 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('fuel_logs').select('*, vehicle:vehicles(*)').order('log_date', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as FuelLog[];
-      } catch (err) {
-        console.error(err);
+        if (!error && data) return data as unknown as FuelLog[];
+      } catch (err: any) {
+        console.error("Get fuel logs Supabase error:", err.message || err);
       }
     }
     const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
@@ -390,9 +422,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('fuel_logs').insert([f]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create fuel log Supabase error:", err.message || err);
+        throw err;
       }
     }
     const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
@@ -407,9 +441,9 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('expenses').select('*, vehicle:vehicles(*)').order('expense_date', { ascending: false });
-        if (!error && data && data.length > 0) return data as unknown as Expense[];
-      } catch (err) {
-        console.error(err);
+        if (!error && data) return data as unknown as Expense[];
+      } catch (err: any) {
+        console.error("Get expenses Supabase error:", err.message || err);
       }
     }
     const expensesList = getSandboxState<Expense>('expenses', mockExpenses);
@@ -424,9 +458,11 @@ export const db = {
     if (isLiveMode) {
       try {
         const { data, error } = await supabase.from('expenses').insert([e]).select().single();
-        if (!error && data) return data;
-      } catch (err) {
-        console.error(err);
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Create expense Supabase error:", err.message || err);
+        throw err;
       }
     }
     const expensesList = getSandboxState<Expense>('expenses', mockExpenses);
@@ -434,5 +470,295 @@ export const db = {
     expensesList.push(newExpense);
     saveSandboxState('expenses', expensesList);
     return newExpense;
+  },
+
+  // PROFILES
+  async getDriverProfiles(): Promise<any[]> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'Driver')
+          .order('full_name');
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Get driver profiles Supabase error:", err.message || err);
+      }
+    }
+    return [
+      { id: 'sb_driver_1', full_name: 'Alex Johnson', role: 'Driver', contact_number: '+1-555-0101' },
+      { id: 'sb_driver_2', full_name: 'Sarah Chen', role: 'Driver', contact_number: '+1-555-0102' },
+      { id: 'sb_driver_3', full_name: 'Mike Ross', role: 'Driver', contact_number: '+1-555-0103' }
+    ];
+  },
+
+  async getProfile(userId: string): Promise<any | null> {
+    if (isLiveMode) {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (!error && data) return data;
+      } catch (err) {
+        console.error("Get profile error:", err);
+      }
+    }
+    return {
+      id: userId,
+      full_name: 'Sandbox Admin',
+      role: 'Fleet Manager',
+      contact_number: '+1-555-0199'
+    };
+  },
+
+  async updateProfile(userId: string, updates: any): Promise<any> {
+    if (isLiveMode) {
+      try {
+        // 1. Fetch current profile row if exists
+        const { data: existing } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle();
+        
+        let data: any;
+        let error: any;
+
+        if (existing) {
+          // If profile exists, use UPDATE and strip 'role' so it CANNOT be changed
+          const { role, id, ...allowedUpdates } = updates;
+          const res = await supabase
+            .from('profiles')
+            .update(allowedUpdates)
+            .eq('id', userId)
+            .select()
+            .single();
+          data = res.data;
+          error = res.error;
+        } else {
+          // If profile does not exist (backfill on update), use INSERT with initial role
+          const payload = { 
+            id: userId, 
+            full_name: updates.full_name || 'Auth User',
+            role: updates.role || 'Fleet Manager',
+            contact_number: updates.contact_number
+          };
+          const res = await supabase
+            .from('profiles')
+            .insert([payload])
+            .select()
+            .single();
+          data = res.data;
+          error = res.error;
+        }
+
+        if (error) throw error;
+        if (data) return data;
+      } catch (err: any) {
+        console.error("Update profile Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    return {
+      id: userId,
+      full_name: updates.full_name || 'Sandbox Admin',
+      role: 'Fleet Manager',
+      contact_number: updates.contact_number
+    };
+  },
+
+  async backfillProfiles(): Promise<{ success: boolean; count: number; message: string }> {
+    if (isLiveMode) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return { success: false, count: 0, message: "No active session found." };
+
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+        if (!profile) {
+          const { error } = await supabase.from('profiles').insert([{
+            id: session.user.id,
+            full_name: session.user.user_metadata?.full_name || 'Restored User',
+            role: session.user.user_metadata?.role || 'Fleet Manager'
+          }]);
+          if (error) throw error;
+          return { success: true, count: 1, message: "Missing profile backfilled successfully." };
+        }
+        return { success: true, count: 0, message: "Profile already exists." };
+      } catch (err: any) {
+        console.error("Backfill error:", err);
+        return { success: false, count: 0, message: err.message || "Failed to backfill." };
+      }
+    }
+    return { success: true, count: 0, message: "Sandbox mode. No backfill needed." };
+  },
+
+  async deleteVehicle(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('vehicles').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete vehicle Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const vehicles = getSandboxState<Vehicle>('vehicles', mockVehicles);
+    const filtered = vehicles.filter(x => x.id !== id);
+    saveSandboxState('vehicles', filtered);
+    return true;
+  },
+
+  async deleteDriver(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('drivers').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete driver Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const drivers = getSandboxState<Driver>('drivers', mockDrivers);
+    const filtered = drivers.filter(x => x.id !== id);
+    saveSandboxState('drivers', filtered);
+    return true;
+  },
+
+  async deleteTrip(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('trips').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete trip Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const trips = getSandboxState<Trip>('trips', mockTrips);
+    const filtered = trips.filter(x => x.id !== id);
+    saveSandboxState('trips', filtered);
+    return true;
+  },
+
+  async deleteMaintenanceLog(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('maintenance_logs').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete maintenance log Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const logs = getSandboxState<MaintenanceLog>('maintenance_logs', mockMaintenanceLogs);
+    const filtered = logs.filter(x => x.id !== id);
+    saveSandboxState('maintenance_logs', filtered);
+    return true;
+  },
+
+  async deleteFuelLog(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('fuel_logs').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete fuel log Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const logs = getSandboxState<FuelLog>('fuel_logs', mockFuelLogs);
+    const filtered = logs.filter(x => x.id !== id);
+    saveSandboxState('fuel_logs', filtered);
+    return true;
+  },
+
+  async deleteExpense(id: string): Promise<boolean> {
+    if (isLiveMode && isUuid(id)) {
+      try {
+        const { error } = await supabase.from('expenses').delete().eq('id', id);
+        if (error) throw error;
+        return true;
+      } catch (err: any) {
+        console.error("Delete expense Supabase error:", err.message || err);
+        throw err;
+      }
+    }
+    const expenses = getSandboxState<Expense>('expenses', mockExpenses);
+    const filtered = expenses.filter(x => x.id !== id);
+    saveSandboxState('expenses', filtered);
+    return true;
+  },
+
+  // NOTIFICATIONS (generated dynamically from data state to satisfy the dynamic rule)
+  async getNotifications(): Promise<{ id: string; type: string; text: string; time: string }[]> {
+    const notificationsList: { id: string; type: string; text: string; time: string }[] = [];
+    
+    try {
+      const drivers = await this.getDrivers();
+      const today = new Date();
+      drivers.forEach(d => {
+        const expiry = new Date(d.license_expiry_date);
+        const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) {
+          notificationsList.push({
+            id: `notif_exp_${d.id}`,
+            type: 'expiry',
+            text: `Driver ${d.name}'s license has EXPIRED!`,
+            time: 'Expired status'
+          });
+        } else if (diffDays <= 30) {
+          notificationsList.push({
+            id: `notif_exp_${d.id}`,
+            type: 'expiry',
+            text: `Driver ${d.name}'s license is expiring in ${diffDays} days!`,
+            time: 'Action required'
+          });
+        }
+      });
+
+      const vehicles = await this.getVehicles();
+      vehicles.forEach(v => {
+        if (v.status === 'In Shop') {
+          notificationsList.push({
+            id: `notif_maint_${v.id}`,
+            type: 'maintenance',
+            text: `Vehicle ${v.registration_number} is undergoing active workshop maintenance.`,
+            time: 'In shop'
+          });
+        } else if (v.odometer > 80000 && v.status === 'Available') {
+          notificationsList.push({
+            id: `notif_odo_${v.id}`,
+            type: 'maintenance',
+            text: `Vehicle ${v.registration_number} high mileage check (${v.odometer.toLocaleString()} km). Schedule service soon.`,
+            time: 'Overdue soon'
+          });
+        }
+      });
+
+      const trips = await this.getTrips();
+      const activeTrips = trips.filter(t => t.status === 'Dispatched');
+      activeTrips.forEach(t => {
+        notificationsList.push({
+          id: `notif_trip_${t.id}`,
+          type: 'trip',
+          text: `Trip TRP-${t.id.substring(0, 4)} is actively in transit to ${t.destination}.`,
+          time: 'Active'
+        });
+      });
+
+    } catch (err) {
+      console.error("Error generating dynamic notifications:", err);
+    }
+
+    // Default notifications if none generated to keep UI populated
+    if (notificationsList.length === 0) {
+      notificationsList.push(
+        { id: 'default_1', type: 'expiry', text: 'All fleet drivers licenses are currently in compliance.', time: 'System Check' },
+        { id: 'default_2', type: 'maintenance', text: 'No vehicles require urgent workshop check-in today.', time: 'System Check' }
+      );
+    }
+
+    return notificationsList;
   }
 };

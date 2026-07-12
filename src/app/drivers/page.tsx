@@ -80,7 +80,13 @@ export default function DriversPage() {
       setIsOpen(false);
       fetchDrivers();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error creating driver.');
+      let msg = err.message || 'Error creating driver.';
+      if (msg.includes('duplicate key') || msg.includes('drivers_license_number_key') || err.code === '23505') {
+        msg = `A driver with license number ${licenseNum.toUpperCase()} already exists in the database.`;
+      } else if (msg.includes('row-level security') || err.code === '42501') {
+        msg = 'Permission denied: Only Fleet Managers and Safety Officers are authorized to register drivers.';
+      }
+      setErrorMsg(msg);
     }
   };
 

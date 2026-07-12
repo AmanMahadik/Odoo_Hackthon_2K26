@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle } from '@/lib/mockData';
 import { 
   Plus, 
@@ -63,6 +64,8 @@ function VehiclesContent() {
     if (searchParams.get('add') === 'true') setIsOpen(true);
   }, [searchParams]);
 
+  useRealtimeSync('vehicles', fetchVehicles);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -93,7 +96,13 @@ function VehiclesContent() {
       setIsOpen(false);
       fetchVehicles();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error creating vehicle.');
+      let msg = err.message || 'Error creating vehicle.';
+      if (msg.includes('duplicate key') || msg.includes('vehicles_registration_number_key') || err.code === '23505') {
+        msg = `A vehicle with registration number ${regNum.toUpperCase()} already exists in the database.`;
+      } else if (msg.includes('row-level security') || err.code === '42501') {
+        msg = 'Permission denied: Only Fleet Managers are authorized to register vehicles.';
+      }
+      setErrorMsg(msg);
     }
   };
 
@@ -110,6 +119,16 @@ function VehiclesContent() {
     if (!confirm('Are you sure you want to retire this vehicle?')) return;
     try {
       await db.updateVehicle(id, { status: 'Retired' });
+      fetchVehicles();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this vehicle?')) return;
+    try {
+      await db.deleteVehicle(id);
       fetchVehicles();
     } catch (err) {
       console.error(err);
@@ -232,8 +251,8 @@ function VehiclesContent() {
                           <Button variant="ghost" size="icon">
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          {canAccess('vehicles', 'delete') && vehicle.status !== 'Retired' && (
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleRetire(vehicle.id)}>
+                          {canAccess('vehicles', 'delete') && (
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteVehicle(vehicle.id)} title="Delete vehicle">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
