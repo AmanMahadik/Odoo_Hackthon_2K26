@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRole, getRoleSidebar } from '@/lib/roleContext';
+import LiveOpsMarquee from '@/components/layout/LiveOpsMarquee';
 import { 
   LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, type LucideIcon
 } from 'lucide-react';
@@ -56,13 +57,13 @@ export default function Shell({ children }: ShellProps) {
     <div className="flex flex-col min-h-screen bg-background font-sans antialiased">
       {/* Top Header & Navigation */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 md:px-8">
-          <div className="flex h-16 items-center justify-between relative">
+        <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 md:px-5">
+          <div className="flex h-14 items-center justify-between relative">
             {/* Logo / Brand (Left) */}
             <Link href="/" className="flex items-center gap-2.5 flex-1 min-w-0">
               <img src="/icon/light.png" alt="TransitOps" className="h-10 w-auto dark:hidden shrink-0" />
               <img src="/icon/dark.png" alt="TransitOps" className="h-10 w-auto hidden dark:block shrink-0" />
-              <span className="font-bold text-xl tracking-tight">TransitOps</span>
+              <span className="text-xl tracking-tight">TransitOps</span>
               <Badge variant="secondary" className="ml-1 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0">
                 {role}
               </Badge>
@@ -154,7 +155,7 @@ export default function Shell({ children }: ShellProps) {
               <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
                 <DialogTrigger className="relative h-8 w-8 rounded-full p-0 flex items-center justify-center hover:bg-muted transition-colors outline-none cursor-pointer">
                   <Avatar className="h-7 w-7">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
                       {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
                     </AvatarFallback>
                   </Avatar>
@@ -170,16 +171,16 @@ export default function Shell({ children }: ShellProps) {
                   <div className="overflow-y-auto flex-1 px-4 py-4 space-y-6">
                     {/* Profile */}
                     <section className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Profile</h3>
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Profile</h3>
                       <div className="rounded-xl border border-border p-4 space-y-4">
                         <div className="flex items-center gap-4">
                           <Avatar className="h-16 w-16">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+                            <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-medium">
                               {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h4 className="text-lg font-bold">{profile?.full_name || 'Auth User'}</h4>
+                            <h4 className="text-lg font-medium">{profile?.full_name || 'Auth User'}</h4>
                             <Badge className="mt-1">{role}</Badge>
                             {profile?.email && (
                               <p className="text-xs text-muted-foreground mt-1">{profile.email}</p>
@@ -191,7 +192,7 @@ export default function Shell({ children }: ShellProps) {
 
                     {/* Verification */}
                     <section className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verification</h3>
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Verification</h3>
                       <div className="rounded-xl border border-border p-4 space-y-3">
                         <div className="flex items-center gap-2">
                           <ShieldCheck className="h-5 w-5 text-emerald-500" />
@@ -223,7 +224,7 @@ export default function Shell({ children }: ShellProps) {
 
                     {/* Theme */}
                     <section className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Theme</h3>
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Theme</h3>
                       <div className="rounded-xl border border-border p-4 space-y-3">
                         <p className="text-xs text-muted-foreground">Customize interface appearance.</p>
                         <div className="flex gap-2">
@@ -257,7 +258,7 @@ export default function Shell({ children }: ShellProps) {
 
                     {/* System */}
                     <section className="space-y-3">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System</h3>
+                      <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">System</h3>
                       <div className="rounded-xl border border-border p-4 space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Platform version</span>
@@ -307,6 +308,9 @@ export default function Shell({ children }: ShellProps) {
           </div>
         </div>
       </header>
+
+      {/* Continuous live state ticker strip under title nav */}
+      <LiveOpsMarquee />
 
       {/* Mobile Navigation Dropdown */}
       {mobileMenuOpen && (
@@ -367,11 +371,13 @@ export default function Shell({ children }: ShellProps) {
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 container mx-auto p-4 md:p-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight">{currentPage}</h1>
-        </div>
+      {/* Main — same width as title bar; no extra title gap on dashboard (page owns row) */}
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-3 sm:px-4 md:px-5 py-2 md:py-3">
+        {pathname !== '/' && (
+          <div className="mb-2 flex items-center justify-between">
+            <h1 className="text-lg tracking-tight text-foreground font-normal">{currentPage}</h1>
+          </div>
+        )}
         {children}
       </main>
     </div>
