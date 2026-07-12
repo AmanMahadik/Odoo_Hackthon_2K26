@@ -329,8 +329,8 @@ export default function LiveFleetMap({
       {/* key forces tile refresh when theme flips */}
       <MapContainer
         key={isDark ? 'map-dark' : 'map-light'}
-        center={[19.076, 72.8777]}
-        zoom={11}
+        center={[18.5204, 73.8567]}
+        zoom={12}
         style={{ height: '100%', width: '100%' }}
         className={`z-0 leaflet-theme ${isDark ? 'leaflet-dark' : 'leaflet-light'}`}
         attributionControl={false}

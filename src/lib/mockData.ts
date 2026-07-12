@@ -345,8 +345,8 @@ export const mockExpenses: Expense[] = [
 ];
 
 // ============================================
-// GPS ROUTE DATA — Predefined routes for simulation
-// Mumbai area coordinates for realistic demo
+// GPS ROUTE DATA — Pune metro (Maharashtra), inland only
+// Core: ~18.52 N, 73.85 E (Hinjewadi · Baner · Kharadi · Hadapsar · Pimpri)
 // ============================================
 
 export interface GPSRoutePoint {
@@ -357,57 +357,58 @@ export interface GPSRoutePoint {
 }
 
 export const mockGPSRoutes: Record<string, GPSRoutePoint[]> = {
-  // Route: Warehouse A → Distribution Center B (Van-05, Trip t2 area)
-  'route_1': [
-    { lat: 19.0760, lng: 72.8777, speed: 0, heading: 45 },
-    { lat: 19.0820, lng: 72.8850, speed: 35, heading: 48 },
-    { lat: 19.0895, lng: 72.8920, speed: 45, heading: 52 },
-    { lat: 19.0980, lng: 72.9010, speed: 55, heading: 40 },
-    { lat: 19.1050, lng: 72.9100, speed: 60, heading: 35 },
-    { lat: 19.1130, lng: 72.9180, speed: 50, heading: 42 },
-    { lat: 19.1200, lng: 72.9260, speed: 45, heading: 50 },
-    { lat: 19.1280, lng: 72.9340, speed: 30, heading: 55 },
-    { lat: 19.1350, lng: 72.9400, speed: 20, heading: 48 },
-    { lat: 19.1400, lng: 72.9450, speed: 0, heading: 0 },
+  // Hinjewadi IT Park → Kharadi warehouse
+  route_1: [
+    { lat: 18.5912, lng: 73.7389, speed: 0, heading: 90 },
+    { lat: 18.5850, lng: 73.7550, speed: 35, heading: 95 },
+    { lat: 18.5780, lng: 73.7720, speed: 45, heading: 100 },
+    { lat: 18.5700, lng: 73.7900, speed: 50, heading: 105 },
+    { lat: 18.5620, lng: 73.8100, speed: 55, heading: 100 },
+    { lat: 18.5550, lng: 73.8300, speed: 50, heading: 95 },
+    { lat: 18.5500, lng: 73.8500, speed: 45, heading: 90 },
+    { lat: 18.5480, lng: 73.8700, speed: 35, heading: 85 },
+    { lat: 18.5460, lng: 73.8900, speed: 20, heading: 80 },
+    { lat: 18.5450, lng: 73.9050, speed: 0, heading: 0 },
   ],
-  // Route: Port Terminal → Central Depot (TRK-12)
-  'route_2': [
-    { lat: 18.9400, lng: 72.8350, speed: 0, heading: 0 },
-    { lat: 18.9520, lng: 72.8420, speed: 25, heading: 30 },
-    { lat: 18.9650, lng: 72.8500, speed: 40, heading: 25 },
-    { lat: 18.9800, lng: 72.8580, speed: 50, heading: 20 },
-    { lat: 18.9950, lng: 72.8650, speed: 55, heading: 15 },
-    { lat: 19.0100, lng: 72.8700, speed: 60, heading: 10 },
-    { lat: 19.0250, lng: 72.8750, speed: 55, heading: 8 },
-    { lat: 19.0400, lng: 72.8780, speed: 45, heading: 5 },
-    { lat: 19.0550, lng: 72.8800, speed: 30, heading: 0 },
-    { lat: 19.0700, lng: 72.8810, speed: 0, heading: 0 },
+  // Pimpri logistics → Hadapsar industrial
+  route_2: [
+    { lat: 18.6298, lng: 73.7997, speed: 0, heading: 160 },
+    { lat: 18.6150, lng: 73.8100, speed: 30, heading: 155 },
+    { lat: 18.5950, lng: 73.8250, speed: 45, heading: 150 },
+    { lat: 18.5750, lng: 73.8400, speed: 50, heading: 145 },
+    { lat: 18.5550, lng: 73.8550, speed: 55, heading: 140 },
+    { lat: 18.5350, lng: 73.8700, speed: 50, heading: 135 },
+    { lat: 18.5200, lng: 73.8850, speed: 40, heading: 130 },
+    { lat: 18.5050, lng: 73.9000, speed: 30, heading: 125 },
+    { lat: 18.4950, lng: 73.9150, speed: 15, heading: 120 },
+    { lat: 18.4900, lng: 73.9250, speed: 0, heading: 0 },
   ],
-  // Route: Factory → Airport (TRK-07)
-  'route_3': [
-    { lat: 19.1500, lng: 72.8500, speed: 0, heading: 180 },
-    { lat: 19.1380, lng: 72.8550, speed: 30, heading: 175 },
-    { lat: 19.1260, lng: 72.8610, speed: 45, heading: 170 },
-    { lat: 19.1140, lng: 72.8680, speed: 55, heading: 165 },
-    { lat: 19.1020, lng: 72.8720, speed: 60, heading: 160 },
-    { lat: 19.0900, lng: 72.8760, speed: 50, heading: 155 },
-    { lat: 19.0800, lng: 72.8800, speed: 40, heading: 150 },
-    { lat: 19.0700, lng: 72.8850, speed: 25, heading: 145 },
+  // Swargate depot → Baner / Aundh retail
+  route_3: [
+    { lat: 18.5018, lng: 73.8636, speed: 0, heading: 315 },
+    { lat: 18.5120, lng: 73.8500, speed: 30, heading: 310 },
+    { lat: 18.5250, lng: 73.8350, speed: 45, heading: 305 },
+    { lat: 18.5400, lng: 73.8200, speed: 50, heading: 300 },
+    { lat: 18.5550, lng: 73.8050, speed: 55, heading: 295 },
+    { lat: 18.5650, lng: 73.7900, speed: 45, heading: 290 },
+    { lat: 18.5750, lng: 73.7750, speed: 35, heading: 285 },
+    { lat: 18.5820, lng: 73.7600, speed: 20, heading: 280 },
+    { lat: 18.5880, lng: 73.7480, speed: 0, heading: 0 },
   ],
 };
 
-// Vehicle → GPS positions (current state for map)
+// Vehicle → GPS positions (Pune metro)
 export const mockVehiclePositions: Record<string, { lat: number; lng: number; speed: number; heading: number; fuel_percent: number; cargo_kg: number; cargo_max: number; destination: string; eta_minutes: number }> = {
-  'v1': { lat: 19.0760, lng: 72.8777, speed: 0, heading: 0, fuel_percent: 72, cargo_kg: 0, cargo_max: 1200, destination: 'Idle', eta_minutes: 0 },
-  'v2': { lat: 18.9800, lng: 72.8580, speed: 48, heading: 20, fuel_percent: 55, cargo_kg: 4200, cargo_max: 5000, destination: 'Central Depot', eta_minutes: 45 },
-  'v4': { lat: 19.0200, lng: 72.8600, speed: 0, heading: 0, fuel_percent: 80, cargo_kg: 0, cargo_max: 1500, destination: 'Idle', eta_minutes: 0 },
-  'v5': { lat: 19.1140, lng: 72.8680, speed: 55, heading: 165, fuel_percent: 40, cargo_kg: 6500, cargo_max: 8000, destination: 'Airport Cargo Hub', eta_minutes: 32 },
-  'v6': { lat: 19.0500, lng: 72.8900, speed: 0, heading: 0, fuel_percent: 90, cargo_kg: 0, cargo_max: 300, destination: 'Idle', eta_minutes: 0 },
-  'v7': { lat: 19.0400, lng: 72.8350, speed: 35, heading: 280, fuel_percent: 62, cargo_kg: 1800, cargo_max: 2000, destination: 'Retail Outlet West', eta_minutes: 18 },
-  'v8': { lat: 19.0650, lng: 72.8450, speed: 0, heading: 0, fuel_percent: 85, cargo_kg: 0, cargo_max: 1400, destination: 'Idle', eta_minutes: 0 },
-  'v9': { lat: 19.0900, lng: 72.9100, speed: 0, heading: 0, fuel_percent: 95, cargo_kg: 0, cargo_max: 10000, destination: 'Idle', eta_minutes: 0 },
-  'v10': { lat: 19.0300, lng: 72.8700, speed: 0, heading: 0, fuel_percent: 78, cargo_kg: 0, cargo_max: 200, destination: 'Idle', eta_minutes: 0 },
-  'v12': { lat: 19.0550, lng: 72.8550, speed: 0, heading: 0, fuel_percent: 88, cargo_kg: 0, cargo_max: 250, destination: 'Idle', eta_minutes: 0 },
+  v1: { lat: 18.5204, lng: 73.8567, speed: 0, heading: 0, fuel_percent: 72, cargo_kg: 0, cargo_max: 1200, destination: 'Idle · Swargate', eta_minutes: 0 },
+  v2: { lat: 18.5750, lng: 73.8400, speed: 48, heading: 145, fuel_percent: 55, cargo_kg: 4200, cargo_max: 5000, destination: 'Hadapsar Hub', eta_minutes: 45 },
+  v4: { lat: 18.5590, lng: 73.7890, speed: 0, heading: 0, fuel_percent: 80, cargo_kg: 0, cargo_max: 1500, destination: 'Idle · Aundh', eta_minutes: 0 },
+  v5: { lat: 18.5550, lng: 73.8300, speed: 55, heading: 100, fuel_percent: 40, cargo_kg: 6500, cargo_max: 8000, destination: 'Kharadi Warehouse', eta_minutes: 32 },
+  v6: { lat: 18.5362, lng: 73.8930, speed: 0, heading: 0, fuel_percent: 90, cargo_kg: 0, cargo_max: 300, destination: 'Idle · Magarpatta', eta_minutes: 0 },
+  v7: { lat: 18.5650, lng: 73.7900, speed: 35, heading: 290, fuel_percent: 62, cargo_kg: 1800, cargo_max: 2000, destination: 'Hinjewadi Phase 1', eta_minutes: 18 },
+  v8: { lat: 18.5089, lng: 73.9260, speed: 0, heading: 0, fuel_percent: 85, cargo_kg: 0, cargo_max: 1400, destination: 'Idle · Hadapsar', eta_minutes: 0 },
+  v9: { lat: 18.6298, lng: 73.7997, speed: 0, heading: 0, fuel_percent: 95, cargo_kg: 0, cargo_max: 10000, destination: 'Idle · Pimpri', eta_minutes: 0 },
+  v10: { lat: 18.5679, lng: 73.9143, speed: 0, heading: 0, fuel_percent: 78, cargo_kg: 0, cargo_max: 200, destination: 'Idle · Viman Nagar', eta_minutes: 0 },
+  v12: { lat: 18.4574, lng: 73.8500, speed: 0, heading: 0, fuel_percent: 88, cargo_kg: 0, cargo_max: 250, destination: 'Idle · Katraj', eta_minutes: 0 },
 };
 
 // ============================================

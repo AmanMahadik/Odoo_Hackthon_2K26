@@ -69,14 +69,7 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
             { name: 'Vehicles', path: '/vehicles', icon: 'Truck' },
             { name: 'Drivers', path: '/drivers', icon: 'Users' },
             { name: 'Trips', path: '/trips', icon: 'Navigation' },
-          ],
-        },
-        {
-          name: 'Safety',
-          icon: 'ShieldCheck',
-          subItems: [
             { name: 'Safety Command', path: '/safety-command', icon: 'ShieldAlert' },
-            { name: 'Drivers', path: '/drivers', icon: 'Users' },
           ],
         },
         {

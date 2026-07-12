@@ -192,9 +192,10 @@ type LiveDispatch = {
 };
 const liveDispatches: Record<string, LiveDispatch> = {};
 
-const DISPATCH_STORE = 'transitops_live_dispatches';
-const ROUTE_STORE = 'transitops_dynamic_routes';
-const PROGRESS_STORE = 'transitops_route_progress';
+// v2 = Pune metro coords (invalidate old Mumbai ocean positions in localStorage)
+const DISPATCH_STORE = 'transitops_live_dispatches_v2';
+const ROUTE_STORE = 'transitops_dynamic_routes_v2';
+const PROGRESS_STORE = 'transitops_route_progress_v2';
 
 function readSandboxVehicles(): Vehicle[] {
   if (typeof window === 'undefined') return mockVehicles;
@@ -250,7 +251,22 @@ if (typeof window !== 'undefined') {
   hydrateDispatchState();
 }
 
-/** Build a simple Mumbai-area polyline from a start point */
+/** Clamp to Pune metro bbox so markers never drift over ocean */
+const PUNE = {
+  latMin: 18.42,
+  latMax: 18.68,
+  lngMin: 73.72,
+  lngMax: 74.0,
+};
+
+function clampPune(lat: number, lng: number): { lat: number; lng: number } {
+  return {
+    lat: Math.min(PUNE.latMax, Math.max(PUNE.latMin, lat)),
+    lng: Math.min(PUNE.lngMax, Math.max(PUNE.lngMin, lng)),
+  };
+}
+
+/** Inland polyline around Pune (Hinjewadi / Baner / Kharadi corridor) */
 function buildRouteFromBase(
   startLat: number,
   startLng: number,
@@ -258,17 +274,21 @@ function buildRouteFromBase(
 ): GPSRoutePoint[] {
   const points: GPSRoutePoint[] = [];
   const n = 10;
-  let lat = startLat;
-  let lng = startLng;
-  const dLat = 0.008 + (seed % 5) * 0.0015;
-  const dLng = 0.01 + (seed % 3) * 0.002;
+  const start = clampPune(startLat, startLng);
+  // Prefer east–west / slight north — stay over city land
+  const dLat = ((seed % 2 === 0 ? 1 : -1) * (0.012 + (seed % 4) * 0.002));
+  const dLng = 0.018 + (seed % 5) * 0.003;
   for (let i = 0; i < n; i++) {
     const t = i / (n - 1);
-    const speed = t === 0 || t === 1 ? 0 : 25 + Math.sin(t * Math.PI) * 40;
+    const speed = t === 0 || t === 1 ? 0 : 25 + Math.sin(t * Math.PI) * 35;
     const heading = Math.atan2(dLng, dLat) * (180 / Math.PI);
+    const pos = clampPune(
+      start.lat + dLat * t + Math.sin(t * 3) * 0.003,
+      start.lng + dLng * t + Math.cos(t * 2) * 0.002
+    );
     points.push({
-      lat: lat + dLat * t + Math.sin(t * 4) * 0.002,
-      lng: lng + dLng * t + Math.cos(t * 3) * 0.0015,
+      lat: pos.lat,
+      lng: pos.lng,
       speed,
       heading: (heading + 360) % 360,
     });
@@ -293,8 +313,8 @@ export const gpsService = {
     const vehicles = readSandboxVehicles();
     const vehicle = vehicles.find((v) => v.id === vehicleId) || mockVehicles.find((v) => v.id === vehicleId);
     const base = mockVehiclePositions[vehicleId] || {
-      lat: 19.076 + Math.random() * 0.04,
-      lng: 72.85 + Math.random() * 0.04,
+      lat: 18.52 + Math.random() * 0.06,
+      lng: 73.78 + Math.random() * 0.1,
       speed: 0,
       heading: 0,
       fuel_percent: 70,
@@ -303,12 +323,13 @@ export const gpsService = {
       destination: trip.destination,
       eta_minutes: 40,
     };
+    const start = clampPune(base.lat, base.lng);
 
     // Prefer a free seed route, else generate dynamic polyline
     let routeKey = ROUTE_POOL[Object.keys(liveDispatches).length % ROUTE_POOL.length];
     // Always generate unique dynamic route so new trips are visible distinctly
     routeKey = `dyn_${trip.id}`;
-    dynamicRoutes[routeKey] = buildRouteFromBase(base.lat, base.lng, Date.now() % 97);
+    dynamicRoutes[routeKey] = buildRouteFromBase(start.lat, start.lng, Date.now() % 97);
 
     vehicleRouteMap[vehicleId] = routeKey;
     vehicleDriverMap[vehicleId] = trip.driver_id;
@@ -316,6 +337,8 @@ export const gpsService = {
 
     mockVehiclePositions[vehicleId] = {
       ...base,
+      lat: start.lat,
+      lng: start.lng,
       cargo_kg: trip.cargo_weight || base.cargo_kg,
       cargo_max: vehicle?.max_load_capacity || base.cargo_max,
       destination: trip.destination,
@@ -461,9 +484,13 @@ export const gpsService = {
       const base = mockVehiclePositions[vehicleId];
       const live = destByVehicle[vehicleId];
 
+      const pos = clampPune(
+        a.lat + (b.lat - a.lat) * segT + (Math.random() - 0.5) * 0.0002,
+        a.lng + (b.lng - a.lng) * segT + (Math.random() - 0.5) * 0.0002
+      );
       positions[vehicleId] = {
-        lat: a.lat + (b.lat - a.lat) * segT + (Math.random() - 0.5) * 0.0003,
-        lng: a.lng + (b.lng - a.lng) * segT + (Math.random() - 0.5) * 0.0003,
+        lat: pos.lat,
+        lng: pos.lng,
         speed: Math.max(5, a.speed + (b.speed - a.speed) * segT + (Math.random() - 0.5) * 4),
         heading: a.heading,
         fuel_percent: base?.fuel_percent ?? 60,
@@ -476,47 +503,54 @@ export const gpsService = {
         tripId: live?.tripId,
       };
 
-      routes[vehicleId] = points.map((p) => ({ lat: p.lat, lng: p.lng }));
+      routes[vehicleId] = points.map((p) => {
+        const c = clampPune(p.lat, p.lng);
+        return { lat: c.lat, lng: c.lng };
+      });
     }
 
-    // Idle / shop vehicles near base
+    // Idle / shop vehicles near base (Pune only)
     const allVehicles = readSandboxVehicles();
     for (const v of allVehicles) {
       if (positions[v.id]) continue;
       if (v.status === 'Retired' || v.status === 'Pending') continue;
       const p = mockVehiclePositions[v.id] || {
-        lat: 19.07 + Math.random() * 0.03,
-        lng: 72.86 + Math.random() * 0.03,
+        lat: 18.52 + Math.random() * 0.05,
+        lng: 73.8 + Math.random() * 0.08,
         speed: 0,
         heading: 0,
         fuel_percent: 80,
         cargo_kg: 0,
         cargo_max: v.max_load_capacity,
-        destination: v.status === 'In Shop' ? 'Workshop' : 'Idle',
+        destination: v.status === 'In Shop' ? 'Workshop · Chakan' : 'Idle',
         eta_minutes: 0,
       };
-      // Ensure base exists for next tick
-      if (!mockVehiclePositions[v.id]) mockVehiclePositions[v.id] = { ...p };
+      const c = clampPune(p.lat, p.lng);
+      if (!mockVehiclePositions[v.id]) {
+        mockVehiclePositions[v.id] = { ...p, lat: c.lat, lng: c.lng };
+      }
 
+      const jitter = clampPune(
+        c.lat + (Math.random() - 0.5) * 0.00015,
+        c.lng + (Math.random() - 0.5) * 0.00015
+      );
       positions[v.id] = {
         ...p,
-        lat: p.lat + (Math.random() - 0.5) * 0.0002,
-        lng: p.lng + (Math.random() - 0.5) * 0.0002,
+        lat: jitter.lat,
+        lng: jitter.lng,
         speed: v.status === 'In Shop' ? 0 : p.speed,
-        destination: v.status === 'In Shop' ? 'Workshop' : p.destination || 'Idle',
+        destination: v.status === 'In Shop' ? 'Workshop · Chakan' : p.destination || 'Idle',
         progress: 0,
       };
     }
 
-    // Also include seed mock positions not in sandbox list
     for (const [key, p] of Object.entries(mockVehiclePositions)) {
       if (positions[key]) continue;
-      positions[key] = {
-        ...p,
-        lat: p.lat + (Math.random() - 0.5) * 0.0002,
-        lng: p.lng + (Math.random() - 0.5) * 0.0002,
-        progress: 0,
-      };
+      const c = clampPune(
+        p.lat + (Math.random() - 0.5) * 0.00015,
+        p.lng + (Math.random() - 0.5) * 0.00015
+      );
+      positions[key] = { ...p, lat: c.lat, lng: c.lng, progress: 0 };
     }
 
     persistDispatchState();
