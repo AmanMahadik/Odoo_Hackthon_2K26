@@ -12,7 +12,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Responsive
 import { TrendingUp, TrendingDown, Minus, DollarSign, Brain, Download, Zap } from 'lucide-react';
 
 const chartConfig = {
-  revenue: { label: "Revenue", color: "hsl(var(--primary))" },
+  revenue: { label: "Revenue", color: "#fbbf24" },
   fuel: { label: "Fuel Cost", color: "hsl(var(--destructive))" },
   maintenance: { label: "Maintenance", color: "hsl(var(--chart-3))" },
   labor: { label: "Labor", color: "hsl(var(--chart-4))" },
@@ -101,16 +101,16 @@ export default function EconomicSimulatorPage() {
                   </div>
                   
                   <div className="h-[120px]">
-                    <ChartContainer config={{ price: { label: "Forecast Price", color: "hsl(var(--destructive))" } }}>
+                    <ChartContainer config={{ price: { label: "Forecast Price", color: "#fbbf24" } }}>
                       <AreaChart data={fuelForecast}>
                         <defs>
                           <linearGradient id="fillPrice" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--color-price)" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="var(--color-price)" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Area dataKey="price" type="monotone" stroke="var(--color-price)" fill="url(#fillPrice)" strokeWidth={2} />
+                        <Area dataKey="price" type="monotone" stroke="#fbbf24" fill="url(#fillPrice)" strokeWidth={2.5} />
                       </AreaChart>
                     </ChartContainer>
                   </div>
