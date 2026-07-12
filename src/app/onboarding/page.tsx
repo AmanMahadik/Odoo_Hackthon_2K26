@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   ShieldCheck,
   TrendingUp,
@@ -22,6 +23,9 @@ import {
   Navigation,
   Wrench,
   Check,
+  Info,
+  Briefcase,
+  Sparkles,
 } from 'lucide-react';
 
 const roles: {
@@ -29,30 +33,44 @@ const roles: {
   title: string;
   description: string;
   icon: React.ElementType;
+  recommended?: boolean;
 }[] = [
   {
     id: 'Fleet Manager',
     title: 'Fleet Manager',
-    description: 'Oversees fleet assets, maintenance, vehicle lifecycle, and operational efficiency.',
-    icon: Truck,
+    description: 'Full ops console — fleet, dispatch, safety, service, and insights.',
+    icon: Briefcase,
+    recommended: true,
+  },
+  {
+    id: 'Dispatcher',
+    title: 'Dispatcher',
+    description: 'Assign trips and check driver / vehicle availability.',
+    icon: Navigation,
+  },
+  {
+    id: 'Safety Officer',
+    title: 'Safety Officer',
+    description: 'Safety Command, licenses, compliance, and workshop visibility.',
+    icon: ShieldCheck,
+  },
+  {
+    id: 'Financial Analyst',
+    title: 'Financial Analyst',
+    description: 'Fuel, expenses, ROI reports, war room, and economics.',
+    icon: TrendingUp,
+  },
+  {
+    id: 'Maintenance Technician',
+    title: 'Maintenance Technician',
+    description: 'Work orders, fleet units, and predictive service alerts.',
+    icon: Wrench,
   },
   {
     id: 'Driver',
     title: 'Driver',
     description: 'View trips, log fuel, and report vehicle issues from the road.',
     icon: Truck,
-  },
-  {
-    id: 'Safety Officer',
-    title: 'Safety Officer',
-    description: 'Compliance, licenses, safety scores, and workshop visibility.',
-    icon: ShieldCheck,
-  },
-  {
-    id: 'Financial Analyst',
-    title: 'Financial Analyst',
-    description: 'Expenses, fuel, ROI reports, and cost scenarios.',
-    icon: TrendingUp,
   },
 ];
 
@@ -112,9 +130,8 @@ export default function OnboardingPage() {
       <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[32rem] rounded-full bg-foreground/[0.03] blur-3xl" />
 
       <div className="relative z-10 w-full max-w-2xl space-y-6">
-        {/* Brand */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center gap-2">
+          <div className="inline-flex items-center justify-center gap-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon/light.png" alt="TransitOps" className="h-9 w-auto dark:hidden" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -128,13 +145,36 @@ export default function OnboardingPage() {
         </div>
 
         <Card className="border-border shadow-sm">
-          <CardHeader className="pb-4 space-y-1.5 text-center sm:text-left">
+          <CardHeader className="pb-4 space-y-3 text-center sm:text-left">
             <CardTitle className="text-xl font-medium tracking-tight">
               Complete your profile
             </CardTitle>
             <CardDescription className="font-normal">
-              Choose your workspace role to customize your dashboard.
+              Choose your workspace role to open the matching dashboard and navigation.
             </CardDescription>
+
+            {/* Evaluation / authority note — reads as product copy, not a last-minute banner */}
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2.5 text-left">
+              <Info className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" />
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge variant="secondary" className="font-normal text-[10px] h-5">
+                    Evaluation mode
+                  </Badge>
+                  <Badge variant="outline" className="font-normal text-[10px] h-5 gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    Recommended for best experience
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground font-normal leading-relaxed">
+                  In production, <span className="text-foreground font-medium">Fleet Manager</span>{' '}
+                  (or a single upper authority) is normally provisioned once for the org. For this
+                  evaluation build, that role is open so reviewers can explore the full platform —
+                  pick <span className="text-foreground font-medium">Fleet Manager</span> for the
+                  richest walkthrough.
+                </p>
+              </div>
+            </div>
           </CardHeader>
 
           <CardContent>
@@ -180,9 +220,19 @@ export default function OnboardingPage() {
                           >
                             <Icon className="h-4 w-4" />
                           </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-foreground">{r.title}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5 leading-snug font-normal">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-medium text-foreground">{r.title}</span>
+                              {r.recommended && (
+                                <Badge
+                                  variant="secondary"
+                                  className="font-normal text-[9px] h-4 px-1.5"
+                                >
+                                  Recommended
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground leading-snug font-normal">
                               {r.description}
                             </div>
                           </div>

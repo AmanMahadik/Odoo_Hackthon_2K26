@@ -6,7 +6,13 @@ import { db } from './db';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 
-export type Role = 'Fleet Manager' | 'Safety Officer' | 'Financial Analyst' | 'Driver';
+export type Role =
+  | 'Fleet Manager'
+  | 'Dispatcher'
+  | 'Safety Officer'
+  | 'Financial Analyst'
+  | 'Driver'
+  | 'Maintenance Technician';
 
 export type Theme = 'light' | 'dark';
 export type Currency = 'USD' | 'INR';
@@ -66,6 +72,14 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
           ],
         },
         {
+          name: 'Safety',
+          icon: 'ShieldCheck',
+          subItems: [
+            { name: 'Safety Command', path: '/safety-command', icon: 'ShieldAlert' },
+            { name: 'Drivers', path: '/drivers', icon: 'Users' },
+          ],
+        },
+        {
           name: 'Service',
           icon: 'Wrench',
           subItems: [
@@ -84,12 +98,25 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
         },
       ];
 
+    case 'Dispatcher':
+      return [
+        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+        {
+          name: 'Operations',
+          icon: 'Briefcase',
+          subItems: [
+            { name: 'Dispatch Board', path: '/trips', icon: 'Navigation' },
+            { name: 'Driver Availability', path: '/drivers', icon: 'Users' },
+            { name: 'Vehicle Availability', path: '/vehicles', icon: 'Truck' },
+          ],
+        },
+      ];
 
     case 'Safety Officer':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
         {
-          name: 'Compliance',
+          name: 'Safety',
           icon: 'ShieldCheck',
           subItems: [
             { name: 'Safety Command', path: '/safety-command', icon: 'ShieldAlert' },
@@ -127,6 +154,20 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
         },
       ];
 
+    case 'Maintenance Technician':
+      return [
+        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+        {
+          name: 'Workshop',
+          icon: 'Wrench',
+          subItems: [
+            { name: 'Work Orders', path: '/maintenance', icon: 'Wrench' },
+            { name: 'Fleet Units', path: '/vehicles', icon: 'Truck' },
+            { name: 'Predictions', path: '/ai-predictions', icon: 'Sparkles' },
+          ],
+        },
+      ];
+
     case 'Driver':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
@@ -158,14 +199,14 @@ export function getRoleSidebar(role: Role | null): SidebarItem[] {
 // ============================================
 
 export const routePermissions: Record<string, Role[]> = {
-  '/': ['Fleet Manager', 'Safety Officer', 'Financial Analyst', 'Driver'],
-  '/vehicles': ['Fleet Manager', 'Safety Officer', 'Driver'],
-  '/drivers': ['Fleet Manager', 'Safety Officer'],
-  '/trips': ['Fleet Manager', 'Driver'],
-  '/maintenance': ['Fleet Manager', 'Safety Officer', 'Driver'],
+  '/': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst', 'Driver', 'Maintenance Technician'],
+  '/vehicles': ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Driver', 'Maintenance Technician'],
+  '/drivers': ['Fleet Manager', 'Dispatcher', 'Safety Officer'],
+  '/trips': ['Fleet Manager', 'Dispatcher', 'Driver'],
+  '/maintenance': ['Fleet Manager', 'Maintenance Technician', 'Safety Officer', 'Driver'],
   '/fuel-expenses': ['Fleet Manager', 'Financial Analyst', 'Driver'],
   '/reports': ['Fleet Manager', 'Financial Analyst'],
-  '/ai-predictions': ['Fleet Manager'],
+  '/ai-predictions': ['Fleet Manager', 'Maintenance Technician'],
   '/economic-simulator': ['Fleet Manager', 'Financial Analyst'],
   '/fleet-command': ['Fleet Manager'],
   '/financial-war-room': ['Fleet Manager', 'Financial Analyst'],
