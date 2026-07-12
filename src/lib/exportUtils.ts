@@ -1,3 +1,4 @@
+// Export utilities for reports (CSV and PDF)
 import Papa from 'papaparse';
 
 export const exportToCSV = (filename: string, data: any[]) => {
