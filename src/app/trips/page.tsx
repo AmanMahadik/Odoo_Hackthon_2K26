@@ -6,19 +6,38 @@ import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, Driver, Trip } from '@/lib/mockData';
-import { 
-  Plus, 
-  Play, 
-  CheckCircle2, 
-  XCircle, 
-  MapPin, 
-  Scale, 
+import {
+  Plus,
+  Play,
+  CheckCircle2,
+  XCircle,
+  MapPin,
   AlertTriangle,
-  ArrowRight,
-  TrendingUp,
-  X,
-  Trash2
+  Trash2,
+  Navigation,
+  Truck,
+  User,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 function TripsContent() {
   const searchParams = useSearchParams();
@@ -27,8 +46,8 @@ function TripsContent() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Modal Plan Trip Form State
   const [isOpen, setIsOpen] = useState(false);
   const [source, setSource] = useState('');
   const [destination, setDestination] = useState('');
@@ -39,7 +58,6 @@ function TripsContent() {
   const [formStatus, setFormStatus] = useState<'Draft' | 'Dispatched'>('Draft');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Modal Complete Trip Form State
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completingTripId, setCompletingTripId] = useState('');
   const [actualDist, setActualDist] = useState('');
@@ -53,7 +71,7 @@ function TripsContent() {
       const [tList, vList, dList] = await Promise.all([
         db.getTrips(),
         db.getVehicles(),
-        db.getDrivers()
+        db.getDrivers(),
       ]);
       setTrips(tList);
       setVehicles(vList);
@@ -69,19 +87,24 @@ function TripsContent() {
 
   useEffect(() => {
     fetchData();
-
-    if (searchParams.get('new') === 'true') {
-      setIsOpen(true);
-    }
+    if (searchParams.get('new') === 'true') setIsOpen(true);
   }, [searchParams]);
 
-  // Filter Available entities
-  const availableVehicles = vehicles.filter(v => v.status === 'Available');
-  const availableDrivers = drivers.filter(d => {
-    const isAvail = d.status === 'Available';
-    const isLicenseValid = new Date(d.license_expiry_date) > new Date();
-    return isAvail && isLicenseValid;
+  const availableVehicles = vehicles.filter((v) => v.status === 'Available');
+  const availableDrivers = drivers.filter((d) => {
+    return d.status === 'Available' && new Date(d.license_expiry_date) > new Date();
   });
+
+  const resetCreateForm = () => {
+    setSource('');
+    setDestination('');
+    setSelectedVehicleId('');
+    setSelectedDriverId('');
+    setCargoWeight('');
+    setDistance('');
+    setFormStatus('Draft');
+    setErrorMsg('');
+  };
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,12 +115,15 @@ function TripsContent() {
       return;
     }
 
-    const vehicle = vehicles.find(v => v.id === selectedVehicleId);
+    const vehicle = vehicles.find((v) => v.id === selectedVehicleId);
     if (vehicle && Number(cargoWeight) > vehicle.max_load_capacity) {
-      setErrorMsg(`Cargo weight (${cargoWeight}kg) exceeds selected vehicle maximum load capacity (${vehicle.max_load_capacity}kg).`);
+      setErrorMsg(
+        `Cargo weight (${cargoWeight}kg) exceeds vehicle max capacity (${vehicle.max_load_capacity}kg).`
+      );
       return;
     }
 
+    setSubmitting(true);
     try {
       await db.createTrip({
         source: source.trim(),
@@ -106,58 +132,49 @@ function TripsContent() {
         driver_id: selectedDriverId,
         cargo_weight: Number(cargoWeight),
         planned_distance: Number(distance),
-        status: formStatus
+        status: formStatus,
       });
-
-      // Clear
-      setSource('');
-      setDestination('');
-      setSelectedVehicleId('');
-      setSelectedDriverId('');
-      setCargoWeight('');
-      setDistance('');
-      setFormStatus('Draft');
+      resetCreateForm();
       setIsOpen(false);
-      
       fetchData();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error processing trip dispatch.');
+      setErrorMsg(err.message || 'Error creating trip.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDispatchDraft = async (t: Trip) => {
-    const vehicle = vehicles.find(v => v.id === t.vehicle_id);
-    const driver = drivers.find(d => d.id === t.driver_id);
+    const vehicle = vehicles.find((v) => v.id === t.vehicle_id);
+    const driver = drivers.find((d) => d.id === t.driver_id);
 
     if (vehicle?.status !== 'Available') {
-      alert(`Cannot dispatch: Vehicle ${vehicle?.registration_number} is currently ${vehicle?.status}.`);
+      alert(`Cannot dispatch: Vehicle ${vehicle?.registration_number} is ${vehicle?.status}.`);
       return;
     }
     if (driver?.status !== 'Available') {
-      alert(`Cannot dispatch: Driver ${driver?.name} is currently ${driver?.status}.`);
+      alert(`Cannot dispatch: Driver ${driver?.name} is ${driver?.status}.`);
       return;
     }
     if (driver && new Date(driver.license_expiry_date) < new Date()) {
-      alert(`Cannot dispatch: Driver ${driver?.name} license has expired.`);
+      alert(`Cannot dispatch: Driver ${driver.name} license expired.`);
       return;
     }
 
     try {
       await db.updateTrip(t.id, { status: 'Dispatched' });
       fetchData();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      alert(err.message || 'Dispatch failed.');
     }
   };
 
   const openCompleteModal = (t: Trip) => {
     setCompletingTripId(t.id);
     setActualDist(t.planned_distance.toString());
-    
-    // Auto fill rough estimates for fuel logs helper
-    const estimatedFuel = Math.round(t.planned_distance * 0.15); // 15L/100km avg
+    const estimatedFuel = Math.round(t.planned_distance * 0.15);
     setFuelConsumed(estimatedFuel.toString());
-    setFuelCost((estimatedFuel * 2.15).toFixed(2)); // mock cost per liter
+    setFuelCost((estimatedFuel * 2.15).toFixed(2));
     setCompleteError('');
     setCompleteOpen(true);
   };
@@ -165,37 +182,30 @@ function TripsContent() {
   const handleCompleteTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     setCompleteError('');
-
     if (!actualDist || !fuelConsumed || !fuelCost) {
       setCompleteError('Please input completion metrics.');
       return;
     }
 
+    setSubmitting(true);
     try {
-      const trip = trips.find(x => x.id === completingTripId);
+      const trip = trips.find((x) => x.id === completingTripId);
       if (!trip) return;
 
-      // Update odometer reading on vehicle
-      const vehicle = vehicles.find(v => v.id === trip.vehicle_id);
+      const vehicle = vehicles.find((v) => v.id === trip.vehicle_id);
       const newOdometer = (vehicle?.odometer || 0) + Number(actualDist);
 
-      // Perform updates
       await db.updateTrip(completingTripId, {
         status: 'Completed',
-        actual_distance: Number(actualDist)
+        actual_distance: Number(actualDist),
       });
-
-      await db.updateVehicle(trip.vehicle_id, {
-        odometer: newOdometer
-      });
-
-      // Create fuel log entry
+      await db.updateVehicle(trip.vehicle_id, { odometer: newOdometer });
       await db.createFuelLog({
         vehicle_id: trip.vehicle_id,
         trip_id: completingTripId,
         liters: Number(fuelConsumed),
         cost: Number(fuelCost),
-        log_date: new Date().toISOString().split('T')[0]
+        log_date: new Date().toISOString().split('T')[0],
       });
 
       setCompleteOpen(false);
@@ -203,13 +213,13 @@ function TripsContent() {
       fetchData();
     } catch (err: any) {
       setCompleteError(err.message || 'Error completing trip.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCancelTrip = async (t: Trip) => {
-    if (!confirm('Are you sure you want to cancel this dispatched trip? Vehicle and driver will be returned to Available pool.')) {
-      return;
-    }
+    if (!confirm('Cancel this dispatched trip? Vehicle and driver return to Available.')) return;
     try {
       await db.updateTrip(t.id, { status: 'Cancelled' });
       fetchData();
@@ -219,7 +229,7 @@ function TripsContent() {
   };
 
   const handleDeleteTrip = async (t: Trip) => {
-    if (!confirm('Are you sure you want to permanently delete this trip log?')) return;
+    if (!confirm('Permanently delete this trip log?')) return;
     try {
       await db.deleteTrip(t.id);
       fetchData();
@@ -228,429 +238,390 @@ function TripsContent() {
     }
   };
 
-  // Divide into board columns
-  const getTripsByStatus = (status: Trip['status']) => {
-    return trips.filter(t => t.status === status);
-  };
-
   const statusLanes: Trip['status'][] = ['Draft', 'Dispatched', 'Completed', 'Cancelled'];
 
-  const getLaneStyle = (status: Trip['status']) => {
-    switch (status) {
-      case 'Draft': return 'border-slate-800 bg-[#0F1424]/40';
-      case 'Dispatched': return 'border-blue-800/40 bg-blue-900/5';
-      case 'Completed': return 'border-emerald-800/40 bg-emerald-950/5';
-      case 'Cancelled': return 'border-red-900/20 bg-red-950/5';
-    }
+  const laneMeta: Record<
+    Trip['status'],
+    { title: string; badge: 'secondary' | 'default' | 'outline' | 'destructive' }
+  > = {
+    Draft: { title: 'Draft routes', badge: 'secondary' },
+    Dispatched: { title: 'In transit', badge: 'default' },
+    Completed: { title: 'Completed', badge: 'outline' },
+    Cancelled: { title: 'Cancelled', badge: 'destructive' },
   };
 
-  const getLaneHeader = (status: Trip['status']) => {
-    switch (status) {
-      case 'Draft': return <span className="text-slate-400 font-bold uppercase">Draft Routes</span>;
-      case 'Dispatched': return <span className="text-blue-400 font-bold uppercase animate-pulse">In Transit / Dispatched</span>;
-      case 'Completed': return <span className="text-emerald-400 font-bold uppercase">Completed Deliveries</span>;
-      case 'Cancelled': return <span className="text-red-400 font-bold uppercase">Cancelled</span>;
-    }
-  };
+  const canAct = canAccess('trips', 'dispatch') || canAccess('trips', 'update') || canAccess('trips', 'create');
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-slate-100">Trip Dispatch Board</h2>
-          <p className="text-xs text-slate-400">Enforces driver availability and cargo capacity locks atomically</p>
+          <h2 className="text-xl font-bold tracking-tight">Trip dispatch board</h2>
+          <p className="text-sm text-muted-foreground">
+            Enforces availability, license validity, and cargo capacity on dispatch
+          </p>
         </div>
-
         {canAccess('trips', 'create') && (
-          <button
-            onClick={() => setIsOpen(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/10 cursor-pointer"
-          >
-            <Plus className="h-4 w-4" /> Create Trip
-          </button>
+          <Button onClick={() => setIsOpen(true)} className="gap-2 shrink-0">
+            <Plus className="h-4 w-4" /> Create trip
+          </Button>
         )}
       </div>
 
-      {/* Board Layout */}
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {statusLanes.map((s) => (
+          <Card key={s}>
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">{laneMeta[s].title}</p>
+                <p className="text-2xl font-bold">{trips.filter((t) => t.status === s).length}</p>
+              </div>
+              <Navigation className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-          {statusLanes.map(status => {
-            const laneTrips = getTripsByStatus(status);
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+          {statusLanes.map((status) => {
+            const laneTrips = trips.filter((t) => t.status === status);
             return (
-              <div 
-                key={status} 
-                className={`border p-4 rounded-2xl flex flex-col gap-4 min-h-[500px] shadow-sm transition-all duration-300 ${getLaneStyle(status)}`}
-              >
-                {/* Lane Header */}
-                <div className="flex justify-between items-center border-b border-slate-800/80 pb-2">
-                  <div className="text-xs flex items-center gap-2">
-                    {getLaneHeader(status)}
+              <Card key={status} className="min-h-[420px] flex flex-col">
+                <CardHeader className="pb-3 border-b">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-semibold">{laneMeta[status].title}</CardTitle>
+                    <Badge variant={laneMeta[status].badge}>{laneTrips.length}</Badge>
                   </div>
-                  <span className="text-[10px] bg-slate-800/60 font-bold px-2 py-0.5 rounded-full text-slate-300">
-                    {laneTrips.length}
-                  </span>
-                </div>
-
-                {/* Lane cards */}
-                <div className="space-y-3 overflow-y-auto max-h-[600px] pr-1">
-                  {laneTrips.length === 0 ? (
-                    <div className="text-center py-8 text-[11px] text-slate-500">
-                      Empty Lane
-                    </div>
-                  ) : (
-                    laneTrips.map(t => (
-                      <div 
-                        key={t.id} 
-                        className="p-4 bg-[#141A30] border border-slate-800 hover:border-slate-700/80 rounded-xl space-y-3 transition-all duration-200 shadow-lg"
-                      >
-                        {/* Source/Dest */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-                            <MapPin className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                            <span>{t.source}</span>
-                          </div>
-                          <div className="pl-5 text-[10px] text-slate-500">to</div>
-                          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-                            <MapPin className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                            <span>{t.destination}</span>
-                          </div>
-                        </div>
-
-                        {/* Details */}
-                        <div className="border-t border-slate-800/80 pt-2.5 grid grid-cols-2 gap-2 text-[10px] text-slate-400">
-                          <div>
-                            <span className="block text-slate-500 font-medium">VEHICLE</span>
-                            <span className="font-semibold text-slate-300">
-                              {t.vehicle ? t.vehicle.registration_number : 'Unknown'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-slate-500 font-medium">DRIVER</span>
-                            <span className="font-semibold text-slate-300">
-                              {t.driver ? t.driver.name : 'Unknown'}
-                            </span>
-                          </div>
-                          <div className="mt-1">
-                            <span className="block text-slate-500 font-medium">DISTANCE</span>
-                            <span className="font-semibold text-slate-300">{t.planned_distance} km</span>
-                          </div>
-                          <div className="mt-1">
-                            <span className="block text-slate-500 font-medium">CARGO</span>
-                            <span className="font-semibold text-slate-300">{t.cargo_weight} kg</span>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        {canAccess('trips', 'dispatch') && (
-                          <div className="pt-2 border-t border-slate-800/60 flex gap-2">
-                            {t.status === 'Draft' && (
-                              <button
-                                onClick={() => handleDispatchDraft(t)}
-                                className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                              >
-                                <Play className="h-3 w-3" /> Dispatch Route
-                              </button>
-                            )}
-                            
-                            {t.status === 'Dispatched' && (
-                              <>
-                                <button
-                                  onClick={() => openCompleteModal(t)}
-                                  className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                >
-                                  <CheckCircle2 className="h-3 w-3" /> Complete
-                                </button>
-                                <button
-                                  onClick={() => handleCancelTrip(t)}
-                                  className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors cursor-pointer"
-                                >
-                                  <XCircle className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => handleDeleteTrip(t)}
-                              title="Delete Trip"
-                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))
+                  {status === 'Dispatched' && (
+                    <CardDescription className="text-[11px] flex items-center gap-1.5">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                      </span>
+                      Live board
+                    </CardDescription>
                   )}
-                </div>
-              </div>
+                </CardHeader>
+                <CardContent className="pt-3 flex-1">
+                  <ScrollArea className="h-[480px] pr-2">
+                    <div className="space-y-3">
+                      {laneTrips.length === 0 ? (
+                        <p className="text-center py-10 text-xs text-muted-foreground">Empty lane</p>
+                      ) : (
+                        laneTrips.map((t) => (
+                          <div
+                            key={t.id}
+                            className="rounded-xl border border-border bg-card p-3 space-y-3 shadow-sm"
+                          >
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2 text-xs font-semibold">
+                                <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                <span className="truncate">{t.source}</span>
+                              </div>
+                              <div className="pl-5 text-[10px] text-muted-foreground">to</div>
+                              <div className="flex items-center gap-2 text-xs font-semibold">
+                                <MapPin className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                                <span className="truncate">{t.destination}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[10px] border-t border-border pt-2">
+                              <div>
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <Truck className="h-3 w-3" /> Vehicle
+                                </span>
+                                <span className="font-semibold block">
+                                  {t.vehicle?.registration_number || '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground flex items-center gap-1">
+                                  <User className="h-3 w-3" /> Driver
+                                </span>
+                                <span className="font-semibold block">{t.driver?.name || '—'}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Distance</span>
+                                <span className="font-semibold block">{t.planned_distance} km</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Cargo</span>
+                                <span className="font-semibold block">{t.cargo_weight} kg</span>
+                              </div>
+                            </div>
+
+                            <div className="text-[10px] text-muted-foreground">
+                              Trip #{t.trip_number}
+                              {t.actual_distance != null && ` · actual ${t.actual_distance} km`}
+                            </div>
+
+                            {canAct && (
+                              <div className="flex flex-wrap gap-2 pt-1 border-t border-border">
+                                {t.status === 'Draft' && canAccess('trips', 'dispatch') && (
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 h-8 text-[11px]"
+                                    onClick={() => handleDispatchDraft(t)}
+                                  >
+                                    <Play className="h-3 w-3 mr-1" /> Dispatch
+                                  </Button>
+                                )}
+                                {t.status === 'Dispatched' && canAccess('trips', 'update') && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      className="flex-1 h-8 text-[11px]"
+                                      onClick={() => openCompleteModal(t)}
+                                    >
+                                      <CheckCircle2 className="h-3 w-3 mr-1" /> Complete
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 text-destructive"
+                                      onClick={() => handleCancelTrip(t)}
+                                      title="Cancel trip"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                                {(canAccess('trips', 'delete') || canAccess('trips', 'update')) && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 text-destructive"
+                                    onClick={() => handleDeleteTrip(t)}
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {/* Plan / Create Trip Modal */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <div>
-                <h3 className="font-extrabold text-slate-200 text-sm">Plan Transport Route</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Filters out unavailable vehicles & drivers</p>
+      {/* Create trip */}
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) resetCreateForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Plan transport route</DialogTitle>
+            <DialogDescription>
+              Only Available vehicles and drivers with valid licenses appear here.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTrip} className="space-y-4">
+            {errorMsg && (
+              <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {errorMsg}
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateTrip} className="p-6 space-y-4">
-              {errorMsg && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Source Depot</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Warehouse A"
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Destination</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Port Terminal 3"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Input value={source} onChange={(e) => setSource(e.target.value)} required placeholder="Warehouse A" />
               </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Select Available Vehicle</label>
-                <select
+              <div className="space-y-2">
+                <Label>Destination</Label>
+                <Input
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
                   required
-                  value={selectedVehicleId}
-                  onChange={(e) => setSelectedVehicleId(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="">-- Choose Vehicle --</option>
-                  {availableVehicles.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.registration_number} - {v.model} (Max Load: {v.max_load_capacity}kg)
-                    </option>
-                  ))}
-                </select>
-                {availableVehicles.length === 0 && (
-                  <span className="text-[10px] text-red-400 mt-1 block">Warning: No Available vehicles in registry.</span>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Select Available Driver</label>
-                <select
-                  required
-                  value={selectedDriverId}
-                  onChange={(e) => setSelectedDriverId(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                >
-                  <option value="">-- Choose Operator --</option>
-                  {availableDrivers.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} - Score: {d.safety_score} (Lic: {d.license_category})
-                    </option>
-                  ))}
-                </select>
-                {availableDrivers.length === 0 && (
-                  <span className="text-[10px] text-red-400 mt-1 block">Warning: No Available drivers in registry.</span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cargo Weight (kg)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 500"
-                    value={cargoWeight}
-                    onChange={(e) => setCargoWeight(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Route Distance (km)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 150"
-                    value={distance}
-                    onChange={(e) => setDistance(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Dispatch State</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="formStatus"
-                      checked={formStatus === 'Draft'}
-                      onChange={() => setFormStatus('Draft')}
-                      className="accent-blue-500"
-                    />
-                    Save as Draft
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="formStatus"
-                      checked={formStatus === 'Dispatched'}
-                      onChange={() => setFormStatus('Dispatched')}
-                      className="accent-blue-500"
-                    />
-                    Dispatch Instantly
-                  </label>
-                </div>
-              </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
-                >
-                  Create Route
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Complete Trip Modal */}
-      {completeOpen && (
-        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
-              <div>
-                <h3 className="font-extrabold text-slate-200 text-sm">Log Trip Completion</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Captures final metrics and updates logs</p>
-              </div>
-              <button
-                onClick={() => setCompleteOpen(false)}
-                className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCompleteTrip} className="p-6 space-y-4">
-              {completeError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>{completeError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Actual Distance Covered (km)</label>
-                <input
-                  type="number"
-                  required
-                  placeholder="e.g. 125"
-                  value={actualDist}
-                  onChange={(e) => setActualDist(e.target.value)}
-                  className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none font-semibold"
+                  placeholder="Port Terminal 3"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fuel Consumed (Liters)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="e.g. 45"
-                    value={fuelConsumed}
-                    onChange={(e) => setFuelConsumed(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fuel Cost ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="e.g. 96.75"
-                    value={fuelCost}
-                    onChange={(e) => setFuelCost(e.target.value)}
-                    className="w-full bg-[#161B30] border border-slate-800 focus:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-                  />
-                </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Available vehicle</Label>
+              <Select value={selectedVehicleId} onValueChange={(v) => v && setSelectedVehicleId(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose vehicle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableVehicles.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.registration_number} — {v.model} (max {v.max_load_capacity}kg)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {availableVehicles.length === 0 && (
+                <p className="text-[11px] text-destructive">No Available vehicles in registry.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Available driver</Label>
+              <Select value={selectedDriverId} onValueChange={(v) => v && setSelectedDriverId(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDrivers.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name} — score {d.safety_score} ({d.license_category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {availableDrivers.length === 0 && (
+                <p className="text-[11px] text-destructive">No Available drivers with valid licenses.</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Cargo (kg)</Label>
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  value={cargoWeight}
+                  onChange={(e) => setCargoWeight(e.target.value)}
+                  placeholder="500"
+                />
               </div>
-
-              <div className="pt-4 flex gap-3 border-t border-slate-850 mt-4">
-                <button
-                  type="button"
-                  onClick={() => setCompleteOpen(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-500/10 cursor-pointer"
-                >
-                  Log Completion
-                </button>
+              <div className="space-y-2">
+                <Label>Distance (km)</Label>
+                <Input
+                  type="number"
+                  required
+                  min={0}
+                  value={distance}
+                  onChange={(e) => setDistance(e.target.value)}
+                  placeholder="150"
+                />
               </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+            <div className="space-y-2">
+              <Label>Dispatch state</Label>
+              <div className="flex gap-4 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="formStatus"
+                    checked={formStatus === 'Draft'}
+                    onChange={() => setFormStatus('Draft')}
+                    className="accent-primary"
+                  />
+                  Save as Draft
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="formStatus"
+                    checked={formStatus === 'Dispatched'}
+                    onChange={() => setFormStatus('Dispatched')}
+                    className="accent-primary"
+                  />
+                  Dispatch now
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Create route'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete trip */}
+      <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Log trip completion</DialogTitle>
+            <DialogDescription>
+              Captures distance, fuel, and restores vehicle/driver to Available.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCompleteTrip} className="space-y-4">
+            {completeError && (
+              <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                {completeError}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Actual distance (km)</Label>
+              <Input
+                type="number"
+                required
+                value={actualDist}
+                onChange={(e) => setActualDist(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Fuel (L)</Label>
+                <Input
+                  type="number"
+                  required
+                  value={fuelConsumed}
+                  onChange={(e) => setFuelConsumed(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fuel cost ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={fuelCost}
+                  onChange={(e) => setFuelCost(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setCompleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={submitting}>
+                {submitting ? 'Saving…' : 'Complete'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 export default function TripsPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+        </div>
+      }
+    >
       <TripsContent />
     </Suspense>
   );
 }
-
