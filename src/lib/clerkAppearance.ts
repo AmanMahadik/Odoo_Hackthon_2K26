@@ -21,7 +21,7 @@ export const clerkElements = {
   headerTitle: 'text-foreground text-base font-medium tracking-tight',
   headerSubtitle: 'text-muted-foreground text-sm font-normal',
   socialButtonsBlockButton:
-    'border border-border bg-background text-foreground hover:bg-muted font-normal rounded-xl h-11 shadow-none',
+    'border-0 bg-muted/50 text-foreground hover:bg-muted font-normal rounded-xl h-11 shadow-none ring-0 outline-none',
   socialButtonsBlockButtonText: 'text-foreground font-normal text-sm',
   formFieldLabel: 'text-foreground font-normal text-sm',
   formFieldInput:

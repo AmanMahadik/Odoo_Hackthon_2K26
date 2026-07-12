@@ -259,12 +259,22 @@ button.cl-formButtonPrimary:hover {
   opacity: 0.95;
 }
 
-/* Google / social */
-.cl-socialButtonsBlockButton {
-  background: var(--background) !important;
+/* Google / social — no white/light border */
+.cl-socialButtonsBlockButton,
+.cl-socialButtonsIconButton,
+button.cl-socialButtonsBlockButton {
+  background: color-mix(in oklch, var(--muted) 80%, transparent) !important;
   color: var(--foreground) !important;
-  border: 1px solid var(--border) !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
   border-radius: 0.75rem !important;
+}
+.cl-socialButtonsBlockButton:hover,
+button.cl-socialButtonsBlockButton:hover {
+  background: var(--muted) !important;
+  border: 0 !important;
   box-shadow: none !important;
 }
 
