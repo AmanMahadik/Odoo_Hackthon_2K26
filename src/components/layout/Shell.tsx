@@ -58,20 +58,20 @@ export default function Shell({ children }: ShellProps) {
       {/* Top Header & Navigation */}
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6">
-          {/* 3-column grid so center nav is never covered and stays clickable */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-3.5 md:py-4 min-h-[4rem]">
+          {/* flex + absolute center nav: mobile logo left, actions hard-right; desktop center tabs */}
+          <div className="relative flex items-center justify-between gap-3 py-3.5 md:py-4 min-h-[4rem]">
             {/* Logo / Brand (Left) */}
-            <Link href="/" className="flex items-center gap-1 min-w-0 justify-self-start">
+            <Link href="/" className="flex items-center gap-1 min-w-0 shrink-0 z-10 max-w-[55%] sm:max-w-none">
               <img src="/icon/light.png" alt="TransitOps" className="h-8 w-auto dark:hidden shrink-0" />
               <img src="/icon/dark.png" alt="TransitOps" className="h-8 w-auto hidden dark:block shrink-0" />
-              <span className="text-base md:text-lg tracking-tight font-medium">TransitOps</span>
+              <span className="text-base md:text-lg tracking-tight font-medium truncate">TransitOps</span>
               <Badge variant="secondary" className="ml-1.5 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0 font-normal">
                 {role}
               </Badge>
             </Link>
 
-            {/* Desktop Tabs Navigation (Center) — own column so nothing overlays it */}
-            <nav className="hidden md:flex items-center space-x-1 bg-muted/50 border border-border rounded-full p-1 shadow-sm justify-self-center relative z-50">
+            {/* Desktop Tabs Navigation (Center) */}
+            <nav className="hidden md:flex items-center space-x-1 bg-muted/50 border border-border rounded-full p-1 shadow-sm absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
               {sidebarItems.map((item) => {
                 const Icon = iconMap[item.icon] || LayoutDashboard;
                 const isActive = pathname === item.path || (item.subItems && item.subItems.some(sub => sub.path === pathname));
@@ -115,7 +115,7 @@ export default function Shell({ children }: ShellProps) {
               })}
             </nav>
 
-            <div className="flex items-center gap-2 md:gap-3 shrink-0 justify-self-end">
+            <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0 ml-auto z-10">
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger className="relative flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer outline-none">

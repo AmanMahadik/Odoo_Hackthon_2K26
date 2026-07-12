@@ -208,3 +208,20 @@ a[href*="clerk.com"],
 .cl-footerPages {
   display: none !important;
 }
+
+/* Clerk card follows app surface tokens as fallback */
+.cl-cardBox,
+.cl-card {
+  background: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border-color: var(--border) !important;
+}
+.cl-formFieldInput {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+.cl-formButtonPrimary {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
