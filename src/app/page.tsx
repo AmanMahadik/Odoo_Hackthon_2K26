@@ -14,6 +14,7 @@ import {
   mockDrivers,
 } from '@/lib/mockData';
 import { gpsService, economicService } from '@/lib/mockServices';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import type { FuelPriceData, FuelForecast } from '@/lib/mockData';
 import {
   TrendingUp,
@@ -317,8 +318,62 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
+  // Live refresh when trips / maintenance change elsewhere
+  useRealtimeSync('trips', () => {
+    db.getTrips().then((t) => {
+      gpsService.syncDispatchedTrips(t);
+      setTrips(t);
+      setTripCards([
+        ...t
+          .filter((x) => x.status === 'Dispatched')
+          .map((x) => ({
+            id: x.id,
+            trip_number: x.trip_number,
+            source: x.source,
+            destination: x.destination,
+            kind: 'live' as const,
+          })),
+        ...t
+          .filter((x) => x.status === 'Draft')
+          .map((x) => ({
+            id: x.id,
+            trip_number: x.trip_number,
+            source: x.source,
+            destination: x.destination,
+            kind: 'draft' as const,
+          })),
+      ]);
+    });
+  });
+  useRealtimeSync('maintenance_logs', () => {
+    db.getMaintenanceLogs().then((m) => {
+      setMaintenance(m);
+      setMaintCards([
+        ...m
+          .filter((x) => x.status === 'Open')
+          .map((x) => ({
+            id: x.id,
+            reg: x.vehicle?.registration_number || 'Unit',
+            description: x.description,
+            kind: 'maint' as const,
+            href: '/maintenance',
+          })),
+        {
+          id: 'fuel-desk',
+          reg: 'Fuel desk',
+          description: 'Review recent fill-ups & expense ledger',
+          kind: 'fuel' as const,
+          href: '/fuel-expenses',
+        },
+      ]);
+    });
+  });
+
   // Live positions — on real update, that vehicle slides smoothly to top (no flash)
   useEffect(() => {
+    // Seed map with any already-dispatched trips
+    db.getTrips().then((t) => gpsService.syncDispatchedTrips(t)).catch(() => {});
+
     const tick = () => {
       const state = gpsService.getLiveFleetState();
       const positions = state.positions;

@@ -3,6 +3,7 @@ import {
   Vehicle, Driver, Trip, MaintenanceLog, FuelLog, Expense, AppNotification,
   mockVehicles, mockDrivers, mockTrips, mockMaintenanceLogs, mockFuelLogs, mockExpenses 
 } from './mockData';
+import { emitOpsEvent, gpsService } from './mockServices';
 
 const NOTIF_KEY = 'notifications_inbox';
 
@@ -356,8 +357,18 @@ export const db = {
     if (t.status === 'Dispatched') {
       await this.updateVehicle(t.vehicle_id, { status: 'On Trip' });
       await this.updateDriver(t.driver_id, { status: 'On Trip' });
+      gpsService.startDispatch(newTrip);
+      pushInboxNotification({
+        type: 'dispatch',
+        title: 'Trip dispatched',
+        text: `Trip #${newTrip.trip_number}: ${newTrip.source} → ${newTrip.destination} is live on the map.`,
+        entity_id: newTrip.id,
+        entity_type: 'trip',
+        action_status: 'info',
+      });
     }
 
+    emitOpsEvent('trips', 'create');
     return newTrip;
   },
 
@@ -369,7 +380,14 @@ export const db = {
       try {
         const { data, error } = await supabase.from('trips').update(updates).eq('id', id).select().single();
         if (error) throw error;
-        if (data) return data;
+        if (data) {
+          if (updates.status === 'Dispatched') gpsService.startDispatch(data as Trip);
+          if (updates.status === 'Completed' || updates.status === 'Cancelled') {
+            gpsService.stopDispatch(id);
+          }
+          emitOpsEvent('trips', 'update');
+          return data;
+        }
       } catch (err: any) {
         console.error("Update trip Supabase error:", err.message || err);
         throw err;
@@ -378,16 +396,27 @@ export const db = {
 
     // Sandbox State transitions
     if (currentTrip) {
-      // Dispatch -> On Trip
+      // Dispatch -> On Trip + map tracking
       if (updates.status === 'Dispatched' && currentTrip.status !== 'Dispatched') {
         await this.updateVehicle(currentTrip.vehicle_id, { status: 'On Trip' });
         await this.updateDriver(currentTrip.driver_id, { status: 'On Trip' });
+        const next = { ...currentTrip, ...updates };
+        gpsService.startDispatch(next);
+        pushInboxNotification({
+          type: 'dispatch',
+          title: 'Trip dispatched',
+          text: `Trip #${currentTrip.trip_number}: ${currentTrip.source} → ${currentTrip.destination} is live on the map.`,
+          entity_id: currentTrip.id,
+          entity_type: 'trip',
+          action_status: 'info',
+        });
       }
-      // Complete -> Available
+      // Complete -> Available + remove from map route
       else if (updates.status === 'Completed' && currentTrip.status === 'Dispatched') {
         await this.updateVehicle(currentTrip.vehicle_id, { status: 'Available' });
         await this.updateDriver(currentTrip.driver_id, { status: 'Available' });
-        
+        gpsService.stopDispatch(id);
+
         // Auto create fuel log if complete metrics provided
         if (updates.actual_distance) {
           const liters = Math.round(updates.actual_distance * 0.15); // mock 15L/100km
@@ -404,11 +433,13 @@ export const db = {
       else if (updates.status === 'Cancelled' && currentTrip.status === 'Dispatched') {
         await this.updateVehicle(currentTrip.vehicle_id, { status: 'Available' });
         await this.updateDriver(currentTrip.driver_id, { status: 'Available' });
+        gpsService.stopDispatch(id);
       }
 
       const index = trips.findIndex(item => item.id === id);
       trips[index] = { ...trips[index], ...updates };
       saveSandboxState('trips', trips);
+      emitOpsEvent('trips', 'update');
       return trips[index];
     }
     throw new Error('Trip not found');
@@ -455,7 +486,19 @@ export const db = {
     // Auto set vehicle to In Shop in Sandbox mode
     if (l.status === 'Open') {
       await this.updateVehicle(l.vehicle_id, { status: 'In Shop' });
+      const vehicles = getSandboxState<Vehicle>('vehicles', mockVehicles);
+      const v = vehicles.find((x) => x.id === l.vehicle_id);
+      pushInboxNotification({
+        type: 'maintenance',
+        title: 'Maintenance opened',
+        text: `${v?.registration_number || 'Vehicle'} is in shop — ${l.description.slice(0, 80)}`,
+        entity_id: newLog.id,
+        entity_type: 'vehicle',
+        action_status: 'info',
+        meta: { vehicle_id: l.vehicle_id },
+      });
     }
+    emitOpsEvent('maintenance_logs', 'create');
     return newLog;
   },
 
@@ -467,7 +510,10 @@ export const db = {
       try {
         const { data, error } = await supabase.from('maintenance_logs').update(updates).eq('id', id).select().single();
         if (error) throw error;
-        if (data) return data;
+        if (data) {
+          emitOpsEvent('maintenance_logs', 'update');
+          return data;
+        }
       } catch (err: any) {
         console.error("Update maintenance log Supabase error:", err.message || err);
         throw err;
@@ -498,6 +544,7 @@ export const db = {
       const index = logs.findIndex(item => item.id === id);
       logs[index] = { ...logs[index], ...updates };
       saveSandboxState('maintenance_logs', logs);
+      emitOpsEvent('maintenance_logs', 'update');
       return logs[index];
     }
     throw new Error('Log not found');

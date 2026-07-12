@@ -15,10 +15,27 @@ import {
   mockVehiclePositions,
   GPSRoutePoint,
   mockGPSRoutes,
+  Trip,
+  Vehicle,
+  Driver,
 } from './mockData';
 
 // Utility: simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Cross-tab / in-app live refresh for sandbox mode */
+export function emitOpsEvent(table: string, action?: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent('transitops:ops', { detail: { table, action, at: Date.now() } })
+    );
+    // Also poke localStorage so other tabs wake up
+    localStorage.setItem('transitops_ops_tick', JSON.stringify({ table, action, at: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
 
 // ============================================
 // 1. OCR SERVICE
@@ -143,6 +160,7 @@ const routeProgress: Record<string, number> = {
   v7: 0.4,
 };
 
+/** Static demo routes (seed fleet) */
 const vehicleRouteMap: Record<string, string> = {
   v2: 'route_2',
   v5: 'route_3',
@@ -160,7 +178,213 @@ const vehicleDriverMap: Record<string, string> = {
   v9: 'd7',
 };
 
+/** Dynamic routes generated for newly dispatched trips */
+const dynamicRoutes: Record<string, GPSRoutePoint[]> = {};
+/** tripId → vehicle tracking */
+type LiveDispatch = {
+  tripId: string;
+  vehicleId: string;
+  driverId: string;
+  destination: string;
+  source: string;
+  routeKey: string;
+  cargo_kg: number;
+};
+const liveDispatches: Record<string, LiveDispatch> = {};
+
+const DISPATCH_STORE = 'transitops_live_dispatches';
+const ROUTE_STORE = 'transitops_dynamic_routes';
+const PROGRESS_STORE = 'transitops_route_progress';
+
+function readSandboxVehicles(): Vehicle[] {
+  if (typeof window === 'undefined') return mockVehicles;
+  try {
+    const raw = localStorage.getItem('transitops_sandbox_vehicles');
+    return raw ? JSON.parse(raw) : mockVehicles;
+  } catch {
+    return mockVehicles;
+  }
+}
+
+function readSandboxDrivers(): Driver[] {
+  if (typeof window === 'undefined') return mockDrivers;
+  try {
+    const raw = localStorage.getItem('transitops_sandbox_drivers');
+    return raw ? JSON.parse(raw) : mockDrivers;
+  } catch {
+    return mockDrivers;
+  }
+}
+
+function persistDispatchState() {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DISPATCH_STORE, JSON.stringify(liveDispatches));
+    localStorage.setItem(ROUTE_STORE, JSON.stringify(dynamicRoutes));
+    localStorage.setItem(PROGRESS_STORE, JSON.stringify(routeProgress));
+  } catch {
+    /* ignore */
+  }
+}
+
+function hydrateDispatchState() {
+  if (typeof window === 'undefined') return;
+  try {
+    const d = localStorage.getItem(DISPATCH_STORE);
+    const r = localStorage.getItem(ROUTE_STORE);
+    const p = localStorage.getItem(PROGRESS_STORE);
+    if (d) Object.assign(liveDispatches, JSON.parse(d));
+    if (r) Object.assign(dynamicRoutes, JSON.parse(r));
+    if (p) Object.assign(routeProgress, JSON.parse(p));
+    // restore maps
+    for (const disp of Object.values(liveDispatches)) {
+      vehicleRouteMap[disp.vehicleId] = disp.routeKey;
+      vehicleDriverMap[disp.vehicleId] = disp.driverId;
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+if (typeof window !== 'undefined') {
+  hydrateDispatchState();
+}
+
+/** Build a simple Mumbai-area polyline from a start point */
+function buildRouteFromBase(
+  startLat: number,
+  startLng: number,
+  seed = 0
+): GPSRoutePoint[] {
+  const points: GPSRoutePoint[] = [];
+  const n = 10;
+  let lat = startLat;
+  let lng = startLng;
+  const dLat = 0.008 + (seed % 5) * 0.0015;
+  const dLng = 0.01 + (seed % 3) * 0.002;
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const speed = t === 0 || t === 1 ? 0 : 25 + Math.sin(t * Math.PI) * 40;
+    const heading = Math.atan2(dLng, dLat) * (180 / Math.PI);
+    points.push({
+      lat: lat + dLat * t + Math.sin(t * 4) * 0.002,
+      lng: lng + dLng * t + Math.cos(t * 3) * 0.0015,
+      speed,
+      heading: (heading + 360) % 360,
+    });
+  }
+  return points;
+}
+
+const ROUTE_POOL = ['route_1', 'route_2', 'route_3'];
+
 export const gpsService = {
+  /** Register a dispatched trip so the vehicle appears en-route on the map */
+  startDispatch(trip: Trip): void {
+    if (!trip.vehicle_id) return;
+    const vehicleId = trip.vehicle_id;
+    // stop any prior trip on same vehicle
+    for (const [tid, d] of Object.entries(liveDispatches)) {
+      if (d.vehicleId === vehicleId && tid !== trip.id) {
+        delete liveDispatches[tid];
+      }
+    }
+
+    const vehicles = readSandboxVehicles();
+    const vehicle = vehicles.find((v) => v.id === vehicleId) || mockVehicles.find((v) => v.id === vehicleId);
+    const base = mockVehiclePositions[vehicleId] || {
+      lat: 19.076 + Math.random() * 0.04,
+      lng: 72.85 + Math.random() * 0.04,
+      speed: 0,
+      heading: 0,
+      fuel_percent: 70,
+      cargo_kg: trip.cargo_weight || 0,
+      cargo_max: vehicle?.max_load_capacity || 1000,
+      destination: trip.destination,
+      eta_minutes: 40,
+    };
+
+    // Prefer a free seed route, else generate dynamic polyline
+    let routeKey = ROUTE_POOL[Object.keys(liveDispatches).length % ROUTE_POOL.length];
+    // Always generate unique dynamic route so new trips are visible distinctly
+    routeKey = `dyn_${trip.id}`;
+    dynamicRoutes[routeKey] = buildRouteFromBase(base.lat, base.lng, Date.now() % 97);
+
+    vehicleRouteMap[vehicleId] = routeKey;
+    vehicleDriverMap[vehicleId] = trip.driver_id;
+    routeProgress[vehicleId] = 0.05;
+
+    mockVehiclePositions[vehicleId] = {
+      ...base,
+      cargo_kg: trip.cargo_weight || base.cargo_kg,
+      cargo_max: vehicle?.max_load_capacity || base.cargo_max,
+      destination: trip.destination,
+      eta_minutes: Math.max(15, Math.round((trip.planned_distance || 40) / 1.2)),
+      speed: 35,
+    };
+
+    liveDispatches[trip.id] = {
+      tripId: trip.id,
+      vehicleId,
+      driverId: trip.driver_id,
+      destination: trip.destination,
+      source: trip.source,
+      routeKey,
+      cargo_kg: trip.cargo_weight || 0,
+    };
+
+    persistDispatchState();
+    emitOpsEvent('gps', 'dispatch_start');
+  },
+
+  /** Remove tracking when trip completes/cancels */
+  stopDispatch(tripId: string): void {
+    const d = liveDispatches[tripId];
+    if (!d) return;
+    const { vehicleId, routeKey } = d;
+    delete liveDispatches[tripId];
+    if (routeKey.startsWith('dyn_')) delete dynamicRoutes[routeKey];
+    // only remove route if no other dispatch uses this vehicle
+    const still = Object.values(liveDispatches).some((x) => x.vehicleId === vehicleId);
+    if (!still) {
+      // keep seed demo routes for v2/v5/v7
+      if (!['v2', 'v5', 'v7'].includes(vehicleId)) {
+        delete vehicleRouteMap[vehicleId];
+        delete routeProgress[vehicleId];
+      }
+      if (mockVehiclePositions[vehicleId]) {
+        mockVehiclePositions[vehicleId] = {
+          ...mockVehiclePositions[vehicleId],
+          speed: 0,
+          destination: 'Idle',
+          eta_minutes: 0,
+          cargo_kg: 0,
+        };
+      }
+    }
+    persistDispatchState();
+    emitOpsEvent('gps', 'dispatch_stop');
+  },
+
+  /** Sync all Dispatched trips from DB into the map layer */
+  syncDispatchedTrips(trips: Trip[]): void {
+    const active = trips.filter((t) => t.status === 'Dispatched');
+    const activeIds = new Set(active.map((t) => t.id));
+
+    // stop stale
+    for (const tid of Object.keys(liveDispatches)) {
+      if (!activeIds.has(tid)) this.stopDispatch(tid);
+    }
+    // start missing
+    for (const t of active) {
+      if (!liveDispatches[t.id]) this.startDispatch(t);
+    }
+  },
+
+  getActiveDispatchCount(): number {
+    return Object.keys(liveDispatches).length;
+  },
+
   /** Get current positions of all active vehicles */
   getFleetPositions(): Record<
     string,
@@ -180,8 +404,7 @@ export const gpsService = {
   },
 
   /**
-   * Live fleet state: animates vehicles along predefined routes,
-   * returns current positions + full route polylines for map rendering.
+   * Live fleet state: animates vehicles on seed + dispatched routes.
    */
   getLiveFleetState(): {
     positions: Record<
@@ -198,19 +421,35 @@ export const gpsService = {
         eta_minutes: number;
         progress?: number;
         routeId?: string;
+        tripId?: string;
       }
     >;
     routes: Record<string, { lat: number; lng: number }[]>;
   } {
+    hydrateDispatchState();
     const positions: Record<string, any> = {};
     const routes: Record<string, { lat: number; lng: number }[]> = {};
 
-    // Advance progress for vehicles on active routes
+    const resolvePoints = (routeId: string): GPSRoutePoint[] | undefined => {
+      if (dynamicRoutes[routeId]) return dynamicRoutes[routeId];
+      return mockGPSRoutes[routeId];
+    };
+
+    // Destination overlay from live dispatches
+    const destByVehicle: Record<string, { dest: string; cargo: number; tripId: string }> = {};
+    for (const d of Object.values(liveDispatches)) {
+      destByVehicle[d.vehicleId] = {
+        dest: d.destination,
+        cargo: d.cargo_kg,
+        tripId: d.tripId,
+      };
+    }
+
     for (const [vehicleId, routeId] of Object.entries(vehicleRouteMap)) {
-      const points = mockGPSRoutes[routeId];
+      const points = resolvePoints(routeId);
       if (!points?.length) continue;
 
-      let progress = routeProgress[vehicleId] ?? 0.2;
+      let progress = routeProgress[vehicleId] ?? 0.15;
       progress += 0.015 + Math.random() * 0.01;
       if (progress >= 0.98) progress = 0.05;
       routeProgress[vehicleId] = progress;
@@ -220,6 +459,7 @@ export const gpsService = {
       const b = points[idx + 1];
       const segT = progress * (points.length - 1) - idx;
       const base = mockVehiclePositions[vehicleId];
+      const live = destByVehicle[vehicleId];
 
       positions[vehicleId] = {
         lat: a.lat + (b.lat - a.lat) * segT + (Math.random() - 0.5) * 0.0003,
@@ -227,18 +467,48 @@ export const gpsService = {
         speed: Math.max(5, a.speed + (b.speed - a.speed) * segT + (Math.random() - 0.5) * 4),
         heading: a.heading,
         fuel_percent: base?.fuel_percent ?? 60,
-        cargo_kg: base?.cargo_kg ?? 0,
+        cargo_kg: live?.cargo ?? base?.cargo_kg ?? 0,
         cargo_max: base?.cargo_max ?? 1000,
-        destination: base?.destination ?? 'En route',
+        destination: live?.dest || base?.destination || 'En route',
         eta_minutes: Math.max(1, Math.round((1 - progress) * (base?.eta_minutes || 40))),
         progress,
         routeId,
+        tripId: live?.tripId,
       };
 
       routes[vehicleId] = points.map((p) => ({ lat: p.lat, lng: p.lng }));
     }
 
-    // Idle / non-routed vehicles stay near base positions
+    // Idle / shop vehicles near base
+    const allVehicles = readSandboxVehicles();
+    for (const v of allVehicles) {
+      if (positions[v.id]) continue;
+      if (v.status === 'Retired' || v.status === 'Pending') continue;
+      const p = mockVehiclePositions[v.id] || {
+        lat: 19.07 + Math.random() * 0.03,
+        lng: 72.86 + Math.random() * 0.03,
+        speed: 0,
+        heading: 0,
+        fuel_percent: 80,
+        cargo_kg: 0,
+        cargo_max: v.max_load_capacity,
+        destination: v.status === 'In Shop' ? 'Workshop' : 'Idle',
+        eta_minutes: 0,
+      };
+      // Ensure base exists for next tick
+      if (!mockVehiclePositions[v.id]) mockVehiclePositions[v.id] = { ...p };
+
+      positions[v.id] = {
+        ...p,
+        lat: p.lat + (Math.random() - 0.5) * 0.0002,
+        lng: p.lng + (Math.random() - 0.5) * 0.0002,
+        speed: v.status === 'In Shop' ? 0 : p.speed,
+        destination: v.status === 'In Shop' ? 'Workshop' : p.destination || 'Idle',
+        progress: 0,
+      };
+    }
+
+    // Also include seed mock positions not in sandbox list
     for (const [key, p] of Object.entries(mockVehiclePositions)) {
       if (positions[key]) continue;
       positions[key] = {
@@ -249,20 +519,18 @@ export const gpsService = {
       };
     }
 
+    persistDispatchState();
     return { positions, routes };
   },
 
-  /** Get route points for a given route */
   getRoute(routeId: string): GPSRoutePoint[] {
-    return mockGPSRoutes[routeId] || [];
+    return dynamicRoutes[routeId] || mockGPSRoutes[routeId] || [];
   },
 
-  /** Get all route IDs */
   getRouteIds(): string[] {
-    return Object.keys(mockGPSRoutes);
+    return [...Object.keys(mockGPSRoutes), ...Object.keys(dynamicRoutes)];
   },
 
-  /** Simulate position update (for animation) */
   simulateMovement(
     _currentPos: { lat: number; lng: number },
     routePoints: GPSRoutePoint[],
@@ -278,18 +546,23 @@ export const gpsService = {
     };
   },
 
-  /** Get driver info for a vehicle (for info chip) */
   getDriverForVehicle(
     vehicleId: string
-  ): { driver: (typeof mockDrivers)[0]; vehicle: (typeof mockVehicles)[0] } | null {
-    const driverId = vehicleDriverMap[vehicleId];
-    const vehicle = mockVehicles.find((v) => v.id === vehicleId);
+  ): { driver: Driver; vehicle: Vehicle } | null {
+    const vehicles = readSandboxVehicles();
+    const drivers = readSandboxDrivers();
+    const vehicle =
+      vehicles.find((v) => v.id === vehicleId) ||
+      mockVehicles.find((v) => v.id === vehicleId);
     if (!vehicle) return null;
 
-    // Prefer mapped driver; fall back to any available for idle units
+    // Prefer live dispatch driver
+    const live = Object.values(liveDispatches).find((d) => d.vehicleId === vehicleId);
+    const driverId = live?.driverId || vehicleDriverMap[vehicleId];
     const driver =
-      (driverId ? mockDrivers.find((d) => d.id === driverId) : undefined) ||
-      mockDrivers.find((d) => d.status === 'Available') ||
+      (driverId ? drivers.find((d) => d.id === driverId) || mockDrivers.find((d) => d.id === driverId) : undefined) ||
+      drivers.find((d) => d.status === 'On Trip') ||
+      drivers.find((d) => d.status === 'Available') ||
       mockDrivers[0];
 
     if (!driver) return null;

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
+import { gpsService } from '@/lib/mockServices';
 import { Vehicle, Driver, Trip } from '@/lib/mockData';
 import {
   Plus,
@@ -76,6 +77,8 @@ function TripsContent() {
       setTrips(tList);
       setVehicles(vList);
       setDrivers(dList);
+      // Keep map GPS layer in sync with dispatched trips
+      gpsService.syncDispatchedTrips(tList);
     } catch (err) {
       console.error(err);
     } finally {

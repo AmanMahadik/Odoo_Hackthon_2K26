@@ -280,7 +280,13 @@ export default function LiveFleetMap({
     };
     fetchPos();
     const interval = setInterval(fetchPos, 2500);
-    return () => clearInterval(interval);
+    // Instant refresh when a trip is dispatched / completed
+    const onOps = () => fetchPos();
+    window.addEventListener('transitops:ops', onOps);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('transitops:ops', onOps);
+    };
   }, []);
 
   const getSafetyIcon = (score: number) => {
@@ -313,6 +319,11 @@ export default function LiveFleetMap({
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
         </span>
         Live · {onTripCount} en route
+        {gpsService.getActiveDispatchCount() > 0 && (
+          <span className="normal-case tracking-normal text-muted-foreground">
+            · {gpsService.getActiveDispatchCount()} dispatched
+          </span>
+        )}
       </div>
 
       {/* key forces tile refresh when theme flips */}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { Vehicle, MaintenanceLog } from '@/lib/mockData';
 import {
   Plus,
@@ -75,6 +76,8 @@ export default function MaintenancePage() {
       setLoading(false);
     }
   };
+
+  useRealtimeSync('maintenance_logs', fetchData);
 
   useEffect(() => {
     fetchData();
