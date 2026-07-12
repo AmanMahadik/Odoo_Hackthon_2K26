@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { SignUp } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildClerkAppearance } from '@/lib/clerkAppearance';
+import { getClerkAuthUrls } from '@/lib/authUrls';
 import AuthShell from '@/components/auth/AuthShell';
 
 export default function SignUpPage() {
@@ -20,6 +21,7 @@ export default function SignUpPage() {
       window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   const appearance = buildClerkAppearance(isDark, dark);
+  const urls = useMemo(() => getClerkAuthUrls(), [mounted]);
 
   return (
     <AuthShell
@@ -37,9 +39,9 @@ export default function SignUpPage() {
       <SignUp
         routing="path"
         path="/sign-up"
-        signInUrl="/sign-in"
-        forceRedirectUrl="/onboarding"
-        fallbackRedirectUrl="/onboarding"
+        signInUrl={urls.signInUrl}
+        forceRedirectUrl={urls.afterSignUpUrl}
+        fallbackRedirectUrl={urls.afterSignUpUrl}
         appearance={appearance}
       />
     </AuthShell>
