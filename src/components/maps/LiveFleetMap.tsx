@@ -125,7 +125,7 @@ export default function LiveFleetMap({
 
   return (
     <div
-      className={`relative ${heightClass} w-full overflow-hidden border border-border ${className}`}
+      className={`relative z-0 ${heightClass} w-full overflow-hidden border border-border ${className}`}
     >
       {/* Live indicator */}
       <div className="absolute top-3 right-3 z-[400] bg-background/90 backdrop-blur border border-border px-2.5 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
