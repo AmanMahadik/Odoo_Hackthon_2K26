@@ -73,7 +73,7 @@ export default function EconomicSimulatorPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <DollarSign className="h-6 w-6 text-primary" /> Economic Intelligence Center
+          <DollarSign className="h-6 w-6 text-primary" /> Economics Scenario Lab
         </h2>
         <p className="text-sm text-muted-foreground">AI-driven financial modeling and macro-economic impact simulator.</p>
       </div>
