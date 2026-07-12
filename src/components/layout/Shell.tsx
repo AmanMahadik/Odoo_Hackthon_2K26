@@ -16,7 +16,8 @@ import {
   ShieldAlert, 
   UserCheck,
   TrendingUp,
-  CircleDot
+  CircleDot,
+  LogOut
 } from 'lucide-react';
 
 interface ShellProps {
@@ -25,7 +26,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, setRole } = useRole();
+  const { role, setRole, profile, signOut, isSandboxMode } = useRole();
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Hardcoded notifications for demo context
@@ -46,6 +47,10 @@ export default function Shell({ children }: ShellProps) {
   ];
 
   const roles: Role[] = ['Fleet Manager', 'Dispatcher', 'Safety Officer', 'Financial Analyst', 'Driver'];
+
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased">
@@ -174,15 +179,26 @@ export default function Shell({ children }: ShellProps) {
               )}
             </div>
 
-            {/* Profile Avatar Mock */}
-            <div className="flex items-center gap-3">
+            {/* Profile Avatar & Sign Out */}
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
               <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
-                A
+                {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'A'}
               </div>
               <div className="text-left hidden md:block">
-                <span className="block text-xs font-semibold text-slate-200">Aman Mahadik</span>
-                <span className="block text-[10px] text-slate-500 font-medium">Operations Admin</span>
+                <span className="block text-xs font-semibold text-slate-200 truncate max-w-[120px]" title={profile?.full_name || 'Aman Mahadik'}>
+                  {profile?.full_name || 'Aman Mahadik'}
+                </span>
+                <span className="block text-[10px] text-slate-500 font-medium">
+                  {role} {isSandboxMode ? '(Sandbox)' : ''}
+                </span>
               </div>
+              <button
+                onClick={signOut}
+                title="Sign Out"
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer ml-1"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </header>
