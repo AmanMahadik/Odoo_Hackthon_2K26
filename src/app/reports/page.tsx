@@ -37,7 +37,7 @@ interface VehicleROIReport {
 }
 
 export default function ReportsPage() {
-  const { canAccess } = useRole();
+  const { canAccess, formatCurrency, currency } = useRole();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
@@ -135,9 +135,6 @@ export default function ReportsPage() {
       ? simReportData.reduce((sum, i) => sum + i.roiPercentage, 0) / simReportData.length
       : 0;
 
-  const money = (n: number) =>
-    n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
-
   const handleExportCSV = () => {
     const csvData = simReportData.map((item) => ({
       'Registration Number': item.registrationNumber,
@@ -163,7 +160,7 @@ export default function ReportsPage() {
       fuel: simReportData.reduce((sum, i) => sum + i.fuelCost, 0),
       maintenance: simReportData.reduce((sum, i) => sum + i.maintenanceCost, 0),
       other: simReportData.reduce((sum, i) => sum + i.otherExpenses, 0),
-    });
+    }, formatCurrency);
   };
 
   return (
@@ -250,10 +247,10 @@ export default function ReportsPage() {
                 totalFleetProfit >= 0 ? 'text-emerald-500' : 'text-destructive'
               }`}
             >
-              ${money(totalFleetProfit)}
+              {formatCurrency(totalFleetProfit)}
             </span>
             <span className="text-[11px] text-muted-foreground">
-              Revenues: ${money(totalFleetRevenue)}
+              Revenues: {formatCurrency(totalFleetRevenue)}
             </span>
           </CardContent>
         </Card>
@@ -263,7 +260,7 @@ export default function ReportsPage() {
               Simulated fleet costs
             </span>
             <span className="text-2xl tabular-nums font-medium block">
-              ${money(totalFleetCosts)}
+              {formatCurrency(totalFleetCosts)}
             </span>
             <span className="text-[11px] text-muted-foreground">Includes slider adjustments</span>
           </CardContent>
@@ -295,7 +292,7 @@ export default function ReportsPage() {
             <div>
               <CardTitle className="text-sm font-medium">Vehicle ledger performance</CardTitle>
               <CardDescription className="font-normal">
-                Trip revenue rate $4.00 / km
+                Trip revenue rate {formatCurrency(4.00)} / km
               </CardDescription>
             </div>
             <Badge variant="secondary" className="font-normal">
@@ -328,26 +325,26 @@ export default function ReportsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
-                        ${money(item.fuelCost)}
+                        {formatCurrency(item.fuelCost)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
-                        ${money(item.maintenanceCost)}
+                        {formatCurrency(item.maintenanceCost)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
-                        ${money(item.otherExpenses)}
+                        {formatCurrency(item.otherExpenses)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
-                        ${money(item.totalCosts)}
+                        {formatCurrency(item.totalCosts)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
-                        ${money(item.totalRevenues)}
+                        {formatCurrency(item.totalRevenues)}
                       </TableCell>
                       <TableCell
                         className={`text-right tabular-nums font-normal ${
                           item.netProfit >= 0 ? 'text-emerald-500' : 'text-destructive'
                         }`}
                       >
-                        ${money(item.netProfit)}
+                        {formatCurrency(item.netProfit)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-normal">
                         {item.fuelEfficiency > 0 ? `${item.fuelEfficiency} km/L` : '—'}

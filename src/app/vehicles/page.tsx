@@ -29,7 +29,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 function VehiclesContent() {
   const searchParams = useSearchParams();
-  const { canAccess } = useRole();
+  const { canAccess, currency } = useRole();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -406,7 +406,7 @@ function VehiclesContent() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Acquisition Cost ($)</label>
+                <label className="text-sm font-medium">Acquisition Cost ({currency === 'INR' ? '₹' : '$'})</label>
                 <Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} required placeholder="45000" />
               </div>
               {editingId && (

@@ -143,7 +143,7 @@ function bumpToTop<T extends { id: string }>(list: T[], id: string): T[] {
 }
 
 export default function Dashboard() {
-  const { role, canAccess } = useRole();
+  const { role, canAccess, formatCurrency } = useRole();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   // Theme-aware chart chrome (labels/grid must flip with light/dark)
@@ -645,7 +645,7 @@ export default function Dashboard() {
                   <div className="flex justify-between items-end mb-2">
                     <div>
                       <span className="text-2xl tracking-tight font-medium">
-                        ${fuelIndex.price.toFixed(2)}
+                        {formatCurrency(Number(fuelIndex.price))}
                       </span>
                       <span className="text-sm text-muted-foreground ml-1">/ L</span>
                     </div>

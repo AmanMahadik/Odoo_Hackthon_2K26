@@ -9,6 +9,7 @@ import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 export type Role = 'Fleet Manager' | 'Dispatcher' | 'Safety Officer' | 'Financial Analyst' | 'Driver' | 'Maintenance Technician';
 
 export type Theme = 'light' | 'dark';
+export type Currency = 'USD' | 'INR';
 
 interface UserProfile {
   id: string;
@@ -27,6 +28,9 @@ interface RoleContextType {
   signOut: () => Promise<void>;
   canAccess: (resource: string, action: 'create' | 'read' | 'update' | 'delete' | 'dispatch' | 'export') => boolean;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  currency: Currency;
+  setCurrency: (c: Currency) => void;
+  formatCurrency: (val: number) => string;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -141,12 +145,30 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   const [role, setRoleState] = useState<Role>('Fleet Manager');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [currency, setCurrencyState] = useState<Currency>('USD');
   const router = useRouter();
   const pathname = usePathname();
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut: clerkSignOut } = useClerk();
 
   const loading = !isLoaded || profileLoading;
+
+  // Initialize currency from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('transitops_currency') as Currency;
+      if (stored === 'INR') {
+        setCurrencyState('INR');
+      }
+    }
+  }, []);
+
+  const setCurrency = (c: Currency) => {
+    setCurrencyState(c);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('transitops_currency', c);
+    }
+  };
 
   useEffect(() => {
     async function fetchProfile(userId: string) {
@@ -266,10 +288,23 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const formatCurrency = (val: number): string => {
+    // Only apply conversion for specific roles
+    if (role === 'Fleet Manager' || role === 'Financial Analyst') {
+      if (currency === 'INR') {
+        // Exchange rate assumption: 1 USD = 95.33 INR
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val * 95.33);
+      }
+    }
+    // Default USD formatting
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
+  };
+
   return (
     <RoleContext.Provider value={{ 
       role, setRole, user, profile, loading, 
-      signOut, canAccess, updateProfile 
+      signOut, canAccess, updateProfile,
+      currency, setCurrency, formatCurrency
     }}>
       {children}
     </RoleContext.Provider>

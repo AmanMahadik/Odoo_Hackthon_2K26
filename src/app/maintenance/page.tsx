@@ -44,7 +44,7 @@ import {
 import { Label } from '@/components/ui/label';
 
 export default function MaintenancePage() {
-  const { canAccess } = useRole();
+  const { canAccess, formatCurrency, currency } = useRole();
   const [logs, setLogs] = useState<MaintenanceLog[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,7 +219,7 @@ export default function MaintenancePage() {
             <DollarSign className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${openCost.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(openCost)}</div>
             <p className="text-[10px] text-muted-foreground">Pending close-out</p>
           </CardContent>
         </Card>
@@ -229,7 +229,7 @@ export default function MaintenancePage() {
             <Wrench className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalCost.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalCost)}</div>
             <p className="text-[10px] text-muted-foreground">All logged repairs</p>
           </CardContent>
         </Card>
@@ -318,7 +318,7 @@ export default function MaintenancePage() {
                       <span className="line-clamp-2 text-muted-foreground">{log.description}</span>
                     </TableCell>
                     <TableCell className="font-mono font-medium">
-                      ${log.cost.toLocaleString()}
+                      {formatCurrency(log.cost)}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {new Date(log.opened_at).toLocaleDateString()}
@@ -407,7 +407,7 @@ export default function MaintenancePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Estimated cost ($)</Label>
+              <Label>Estimated cost ({currency === 'INR' ? '₹' : '$'})</Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -450,7 +450,7 @@ export default function MaintenancePage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Final service cost ($)</Label>
+              <Label>Final service cost ({currency === 'INR' ? '₹' : '$'})</Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input

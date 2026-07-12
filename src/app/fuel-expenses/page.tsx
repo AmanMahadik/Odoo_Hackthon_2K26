@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function FuelExpensesPage() {
-  const { canAccess } = useRole();
+  const { canAccess, formatCurrency, currency } = useRole();
   const [activeTab, setActiveTab] = useState<'fuel' | 'expenses'>('fuel');
   const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -158,7 +158,7 @@ export default function FuelExpensesPage() {
         <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground font-normal uppercase tracking-wider block">Cumulative Fuel Expenses</span>
-            <span className="text-2xl font-normal text-foreground">${totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-normal text-foreground">{formatCurrency(totalFuelCost)}</span>
             <p className="text-[10px] text-muted-foreground">From {fuelLogs.length} logs recorded</p>
           </div>
           <div className="p-3 bg-blue-500/10 rounded-xl text-primary">
@@ -169,7 +169,7 @@ export default function FuelExpensesPage() {
         <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground font-normal uppercase tracking-wider block">Cumulative General Expenses</span>
-            <span className="text-2xl font-normal text-foreground">${totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-2xl font-normal text-foreground">{formatCurrency(totalExpenseCost)}</span>
             <p className="text-[10px] text-muted-foreground">Tolls, service charges, repairs</p>
           </div>
           <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
@@ -226,8 +226,8 @@ export default function FuelExpensesPage() {
                     </td>
                     <td className="p-4 text-muted-foreground">{log.log_date}</td>
                     <td className="p-4 text-foreground font-normal">{log.liters} L</td>
-                    <td className="p-4 text-foreground font-normal">${log.cost}</td>
-                    <td className="p-4 text-muted-foreground">${(log.cost / log.liters).toFixed(2)}/L</td>
+                    <td className="p-4 text-foreground font-normal">{formatCurrency(log.cost)}</td>
+                    <td className="p-4 text-muted-foreground">{formatCurrency(log.cost / log.liters)}/L</td>
                     <td className="p-4">
                       {log.trip_id ? (
                         <span className="text-[10px] text-primary font-normal bg-blue-500/10 px-2 py-0.5 rounded-full">
@@ -278,7 +278,7 @@ export default function FuelExpensesPage() {
                       </span>
                     </td>
                     <td className="p-4 text-foreground">{exp.description || 'General fee charge'}</td>
-                    <td className="p-4 text-foreground font-normal">${exp.amount}</td>
+                    <td className="p-4 text-foreground font-normal">{formatCurrency(exp.amount)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -335,7 +335,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Total Cost ($)</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Total Cost ({currency === 'INR' ? '₹' : '$'})</label>
                   <input
                     type="number"
                     step="0.01"
@@ -428,7 +428,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Amount ($)</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Amount ({currency === 'INR' ? '₹' : '$'})</label>
                   <input
                     type="number"
                     step="0.01"

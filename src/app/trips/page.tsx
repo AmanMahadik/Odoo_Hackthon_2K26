@@ -41,7 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 function TripsContent() {
   const searchParams = useSearchParams();
-  const { canAccess } = useRole();
+  const { canAccess, currency } = useRole();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -587,7 +587,7 @@ function TripsContent() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Fuel cost ($)</Label>
+                <Label>Fuel cost ({currency === 'INR' ? '₹' : '$'})</Label>
                 <Input
                   type="number"
                   step="0.01"

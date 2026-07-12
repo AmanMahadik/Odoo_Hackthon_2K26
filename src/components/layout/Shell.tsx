@@ -29,7 +29,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, profile, signOut } = useRole();
+  const { role, profile, signOut, currency, setCurrency } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -254,6 +254,34 @@ export default function Shell({ children }: ShellProps) {
                         </div>
                       </div>
                     </section>
+
+                    {/* Currency (Role Restricted) */}
+                    {(role === 'Fleet Manager' || role === 'Financial Analyst') && (
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Currency</h3>
+                        <div className="rounded-xl border border-border p-4 space-y-3">
+                          <p className="text-xs text-muted-foreground">Select preferred currency for financial data.</p>
+                          <div className="flex gap-2">
+                            <Button
+                              variant={currency === 'USD' ? 'default' : 'outline'}
+                              className="flex-1"
+                              size="sm"
+                              onClick={() => setCurrency('USD')}
+                            >
+                              USD ($)
+                            </Button>
+                            <Button
+                              variant={currency === 'INR' ? 'default' : 'outline'}
+                              className="flex-1"
+                              size="sm"
+                              onClick={() => setCurrency('INR')}
+                            >
+                              INR (₹)
+                            </Button>
+                          </div>
+                        </div>
+                      </section>
+                    )}
 
                     {/* System */}
                     <section className="space-y-3">

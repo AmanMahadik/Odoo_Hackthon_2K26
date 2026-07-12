@@ -16,8 +16,8 @@ export const exportToCSV = (filename: string, data: any[]) => {
   }
 };
 
-export const exportToPDF = async (reportData: any[], totals: any) => {
-  const html = getPDFTemplate(reportData, totals);
+export const exportToPDF = async (reportData: any[], totals: any, formatCurrency: (val: number) => string = (v) => `$${v.toFixed(2)}`) => {
+  const html = getPDFTemplate(reportData, totals, formatCurrency);
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.left = '-10000px';
@@ -97,7 +97,7 @@ export const exportToPDF = async (reportData: any[], totals: any) => {
   setTimeout(capture, 600);
 };
 
-const getPDFTemplate = (reportData: any[], totals: any) => {
+const getPDFTemplate = (reportData: any[], totals: any, formatCurrency: (val: number) => string) => {
   const dateStr = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -108,11 +108,7 @@ const getPDFTemplate = (reportData: any[], totals: any) => {
     minute: '2-digit',
   });
 
-  const money = (val: number) =>
-    `$${Number(val).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  const money = (val: number) => formatCurrency(val);
   const pct = (val: number) => `${Number(val).toFixed(1)}%`;
 
   const rows = reportData
@@ -333,7 +329,7 @@ const getPDFTemplate = (reportData: any[], totals: any) => {
     </table>
 
     <p class="disclaimer">
-      Trip revenue modeled at $4.00 per completed km. Figures reflect current sandbox / live data
+      Trip revenue modeled at ${formatCurrency(4.00)} per completed km. Figures reflect current sandbox / live data
       at generation time and may include what-if slider adjustments from the Reports workspace.
       This document is intended for internal operational review and printing.
     </p>

@@ -40,6 +40,7 @@ import {
   Fuel,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useRole } from '@/lib/roleContext';
 
 const chartConfig = {
   revenue: { label: 'Revenue', color: '#fbbf24' },
@@ -51,6 +52,7 @@ const chartConfig = {
 
 export default function EconomicSimulatorPage() {
   const { resolvedTheme } = useTheme();
+  const { formatCurrency } = useRole();
   const isDark = resolvedTheme === 'dark';
   const chartTick = isDark ? '#e2e8f0' : '#334155';
   const chartGrid = isDark ? '#334155' : '#e2e8f0';
@@ -98,9 +100,6 @@ export default function EconomicSimulatorPage() {
     return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
   };
 
-  const money = (n: number) =>
-    n.toLocaleString(undefined, { maximumFractionDigits: 0, minimumFractionDigits: 0 });
-
   return (
     <div className="space-y-5 font-normal">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -124,7 +123,7 @@ export default function EconomicSimulatorPage() {
             {fuelPrice ? (
               <>
                 <span className="text-2xl tabular-nums font-medium block">
-                  ${Number(fuelPrice.price).toFixed(2)}
+                  {formatCurrency(Number(fuelPrice.price))}
                   <span className="text-sm text-muted-foreground font-normal"> / L</span>
                 </span>
                 <Badge
@@ -151,7 +150,7 @@ export default function EconomicSimulatorPage() {
             {simResult ? (
               <>
                 <span className="text-2xl tabular-nums font-medium block">
-                  ${money(simResult.simulatedMonthlyCost)}
+                  {formatCurrency(simResult.simulatedMonthlyCost)}
                 </span>
                 <Badge
                   variant={simResult.changePercent > 0 ? 'destructive' : 'secondary'}
@@ -178,8 +177,8 @@ export default function EconomicSimulatorPage() {
                     simResult.netImpactWithAI > 0 ? 'text-amber-500' : 'text-emerald-500'
                   }`}
                 >
-                  {simResult.netImpactWithAI > 0 ? '+' : '−'}$
-                  {money(Math.abs(simResult.netImpactWithAI))}
+                  {simResult.netImpactWithAI > 0 ? '+' : '−'}
+                  {formatCurrency(Math.abs(simResult.netImpactWithAI))}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   After recommended mitigations
@@ -266,7 +265,7 @@ export default function EconomicSimulatorPage() {
                     <YAxis
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v) => `$${v / 1000}k`}
+                      tickFormatter={(v) => formatCurrency(v).replace(/\.00$/, '')}
                       tick={{ fill: chartTick, fontSize: 10 }}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
@@ -383,11 +382,11 @@ export default function EconomicSimulatorPage() {
                       Base monthly cost
                     </span>
                     <span className="text-sm text-muted-foreground tabular-nums">
-                      ${money(simResult.currentMonthlyCost)}
+                      {formatCurrency(simResult.currentMonthlyCost)}
                     </span>
                     <div className="mt-3 flex items-end gap-2">
                       <span className="text-2xl font-medium tabular-nums tracking-tight">
-                        ${money(simResult.simulatedMonthlyCost)}
+                        {formatCurrency(simResult.simulatedMonthlyCost)}
                       </span>
                       <Badge
                         variant={simResult.changePercent > 0 ? 'destructive' : 'secondary'}
@@ -416,7 +415,7 @@ export default function EconomicSimulatorPage() {
                             </span>
                           </div>
                           <span className="tabular-nums text-emerald-500 font-medium shrink-0 text-sm">
-                            −${r.savings}
+                            −{formatCurrency(r.savings)}
                           </span>
                         </div>
                       ))}
@@ -430,8 +429,8 @@ export default function EconomicSimulatorPage() {
                         simResult.netImpactWithAI > 0 ? 'text-amber-500' : 'text-emerald-500'
                       }`}
                     >
-                      {simResult.netImpactWithAI > 0 ? '+' : '−'}$
-                      {money(Math.abs(simResult.netImpactWithAI))}
+                      {simResult.netImpactWithAI > 0 ? '+' : '−'}
+                      {formatCurrency(Math.abs(simResult.netImpactWithAI))}
                     </span>
                   </div>
 
