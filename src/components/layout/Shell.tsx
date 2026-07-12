@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useRole, getRoleSidebar } from '@/lib/roleContext';
 import LiveOpsMarquee from '@/components/layout/LiveOpsMarquee';
 import { 
-  LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, type LucideIcon
+  LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, Sparkles, Activity, type LucideIcon
 } from 'lucide-react';
 
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { useTheme } from "next-themes";
 
 // Icon lookup map
 const iconMap: Record<string, LucideIcon> = {
-  LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Briefcase
+  LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Briefcase, Sparkles, Activity
 };
 
 interface ShellProps {

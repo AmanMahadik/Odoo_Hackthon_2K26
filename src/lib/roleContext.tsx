@@ -68,7 +68,7 @@ export function getRoleSidebar(role: Role): SidebarItem[] {
           name: 'Insights', icon: 'BarChart3',
           subItems: [
             { name: 'Reports', path: '/reports', icon: 'BarChart3' },
-            { name: 'AI Predictions', path: '/ai-predictions', icon: 'Brain' },
+            { name: 'Prediction', path: '/ai-predictions', icon: 'Sparkles' },
             { name: 'Economics', path: '/economic-simulator', icon: 'TrendingUp' },
           ]
         }
