@@ -212,9 +212,13 @@ a[href*="clerk.com"],
 /* Clerk card follows app surface tokens as fallback */
 .cl-cardBox,
 .cl-card {
-  background: var(--card) !important;
+  background: transparent !important;
   color: var(--card-foreground) !important;
-  border-color: var(--border) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.cl-rootBox {
+  width: 100% !important;
 }
 .cl-formFieldInput {
   background: var(--background) !important;
@@ -224,4 +228,22 @@ a[href*="clerk.com"],
 .cl-formButtonPrimary {
   background: var(--primary) !important;
   color: var(--primary-foreground) !important;
+}
+.cl-socialButtonsBlockButton {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+.cl-dividerLine {
+  background: var(--border) !important;
+}
+.cl-dividerText,
+.cl-headerSubtitle,
+.cl-formFieldLabel,
+.cl-footerActionText {
+  color: var(--muted-foreground) !important;
+}
+.cl-headerTitle {
+  color: var(--foreground) !important;
+  font-weight: 500 !important;
 }
