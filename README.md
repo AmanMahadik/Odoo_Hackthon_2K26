@@ -1,11 +1,17 @@
-# TransitOps
-
-**Smart Transport Operations Platform** — fleet, drivers, dispatch, maintenance, fuel, safety, and financial insights in one workspace.
-
+<!-- Logo + name (centered, side by side) -->
 <p align="center">
-  <img src="public/icon/dark.png" alt="TransitOps" width="72" />
+  <img src="public/icon/dark.png#gh-dark-mode-only" alt="" height="48" style="vertical-align: middle; margin-right: 10px;" />
+  <img src="public/icon/light.png#gh-light-mode-only" alt="" height="48" style="vertical-align: middle; margin-right: 10px;" />
+  <span style="font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; vertical-align: middle;">TransitOps</span>
 </p>
 
+<p align="center">
+  <em>Smart Transport Operations Platform</em> — fleet, drivers, dispatch, maintenance, fuel, safety, and financial insights in one workspace.
+</p>
+
+---
+
+<!-- Stack chips -->
 <p align="center">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=nextdotjs" />
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" />
