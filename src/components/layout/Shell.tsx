@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SignOutButton } from '@clerk/nextjs';
 import { useRole, getRoleSidebar } from '@/lib/roleContext';
 import { 
   LayoutDashboard, Truck, Users, Navigation, Wrench, DollarSign, BarChart3, Bell, ShieldAlert, ShieldCheck, UserCheck, TrendingUp, CircleDot, LogOut, MapPin, Brain, Monitor, Menu, X, Settings, User, Briefcase, type LucideIcon
@@ -14,7 +13,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "next-themes";
 
@@ -161,22 +159,19 @@ export default function Shell({ children }: ShellProps) {
                     </AvatarFallback>
                   </Avatar>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px]">
-                  <DialogHeader>
+                <DialogContent className="sm:max-w-[520px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+                  <DialogHeader className="px-4 pt-4 pb-3 border-b border-border shrink-0">
                     <DialogTitle>Account & Settings</DialogTitle>
                     <DialogDescription>
-                      Manage your profile, themes, and verify credentials.
+                      Profile, verification, theme, and system — all in one place. Scroll to explore.
                     </DialogDescription>
                   </DialogHeader>
-                  <Tabs defaultValue="profile" className="w-full mt-4">
-                    <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="profile">Profile</TabsTrigger>
-                      <TabsTrigger value="verification">Verification</TabsTrigger>
-                      <TabsTrigger value="theme">Theme</TabsTrigger>
-                      <TabsTrigger value="system">System</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="profile" className="p-4 border rounded-md mt-4">
-                      <div className="space-y-4">
+
+                  <div className="overflow-y-auto flex-1 px-4 py-4 space-y-6">
+                    {/* Profile */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Profile</h3>
+                      <div className="rounded-xl border border-border p-4 space-y-4">
                         <div className="flex items-center gap-4">
                           <Avatar className="h-16 w-16">
                             <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
@@ -184,97 +179,123 @@ export default function Shell({ children }: ShellProps) {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h3 className="text-lg font-bold">{profile?.full_name || 'Auth User'}</h3>
+                            <h4 className="text-lg font-bold">{profile?.full_name || 'Auth User'}</h4>
                             <Badge className="mt-1">{role}</Badge>
+                            {profile?.email && (
+                              <p className="text-xs text-muted-foreground mt-1">{profile.email}</p>
+                            )}
                           </div>
                         </div>
-                        <Separator />
-                        <Button variant="destructive" className="w-full" onClick={() => {
-                          setSettingsOpen(false);
-                          signOut();
-                        }}>
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Sign Out
-                        </Button>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="verification" className="p-4 border rounded-md mt-4">
-                      <div className="space-y-4">
-                        <h3 className="font-semibold text-lg flex items-center gap-2">
-                          <ShieldCheck className="h-5 w-5 text-green-500" />
-                          Driver Credentials
-                        </h3>
-                        <p className="text-sm text-muted-foreground">Your driver credentials have been verified by the OCR engine.</p>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                    </section>
+
+                    {/* Verification */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verification</h3>
+                      <div className="rounded-xl border border-border p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-5 w-5 text-emerald-500" />
+                          <span className="font-semibold text-sm">Driver credentials</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Credentials verified by the OCR engine and registry check.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <span className="text-muted-foreground">License No:</span>
+                            <span className="text-muted-foreground text-xs">License No</span>
                             <p className="font-medium">DL-84920485</p>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Status:</span>
-                            <p className="font-medium text-green-500">Active</p>
+                            <span className="text-muted-foreground text-xs">Status</span>
+                            <p className="font-medium text-emerald-500">Active</p>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Class:</span>
+                            <span className="text-muted-foreground text-xs">Class</span>
                             <p className="font-medium">CDL-A</p>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">Expires:</span>
+                            <span className="text-muted-foreground text-xs">Expires</span>
                             <p className="font-medium">10/24/2028</p>
                           </div>
                         </div>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="theme" className="p-4 border rounded-md mt-4">
-                      <div className="space-y-4">
-                        <h3 className="font-semibold text-lg">Appearance</h3>
-                        <p className="text-sm text-muted-foreground">Customize the interface theme.</p>
-                        <div className="flex gap-4">
-                          <Button 
-                            variant={mounted && theme === 'light' ? 'default' : 'outline'} 
+                    </section>
+
+                    {/* Theme */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Theme</h3>
+                      <div className="rounded-xl border border-border p-4 space-y-3">
+                        <p className="text-xs text-muted-foreground">Customize interface appearance.</p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={mounted && theme === 'light' ? 'default' : 'outline'}
                             className="flex-1"
+                            size="sm"
                             onClick={() => setTheme('light')}
                           >
                             Light
                           </Button>
-                          <Button 
-                            variant={mounted && theme === 'dark' ? 'default' : 'outline'} 
+                          <Button
+                            variant={mounted && theme === 'dark' ? 'default' : 'outline'}
                             className="flex-1"
+                            size="sm"
                             onClick={() => setTheme('dark')}
                           >
                             Dark
                           </Button>
-                          <Button 
-                            variant={mounted && theme === 'system' ? 'default' : 'outline'} 
+                          <Button
+                            variant={mounted && theme === 'system' ? 'default' : 'outline'}
                             className="flex-1"
+                            size="sm"
                             onClick={() => setTheme('system')}
                           >
                             System
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">*Note: The theme applies standard Shadcn tokens.</p>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="system" className="p-4 border rounded-md mt-4">
-                      <div className="space-y-4">
-                        <h3 className="font-semibold text-lg">System Information</h3>
-                        <div className="text-sm space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Platform Version:</span>
-                            <span className="font-medium">v2.4.0-ultra</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">API Status:</span>
-                            <span className="font-medium text-green-500 flex items-center gap-1"><CircleDot className="h-3 w-3" /> Online</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Telemetry:</span>
-                            <span className="font-medium text-green-500 flex items-center gap-1"><CircleDot className="h-3 w-3" /> Live</span>
-                          </div>
+                    </section>
+
+                    {/* System */}
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System</h3>
+                      <div className="rounded-xl border border-border p-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Platform version</span>
+                          <span className="font-medium">v2.4.0-ultra</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">API status</span>
+                          <span className="font-medium text-emerald-500 flex items-center gap-1">
+                            <CircleDot className="h-3 w-3" /> Online
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Telemetry</span>
+                          <span className="font-medium text-emerald-500 flex items-center gap-1">
+                            <CircleDot className="h-3 w-3" /> Live
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Role access</span>
+                          <span className="font-medium">{role}</span>
                         </div>
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                    </section>
+                  </div>
+
+                  <div className="px-4 py-3 border-t border-border shrink-0">
+                    <Button
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        signOut();
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Sign Out
+                    </Button>
+                  </div>
                 </DialogContent>
               </Dialog>
 
