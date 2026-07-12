@@ -171,13 +171,13 @@ export default function Dashboard() {
   const highRiskDrivers = mockDrivers.filter((d) => d.safety_score < 75);
   const excellentDrivers = mockDrivers.filter((d) => d.safety_score >= 90);
   const scoreDistribution = [
-    { name: '90-100 Excellent', count: excellentDrivers.length, fill: 'hsl(var(--primary))' },
+    { name: '90-100 Excellent', count: excellentDrivers.length, fill: '#10b981' },
     {
       name: '75-89 Average',
       count: mockDrivers.length - highRiskDrivers.length - excellentDrivers.length,
-      fill: 'hsl(var(--muted-foreground))',
+      fill: '#f59e0b',
     },
-    { name: '<75 High Risk', count: highRiskDrivers.length, fill: 'hsl(var(--destructive))' },
+    { name: '<75 High Risk', count: highRiskDrivers.length, fill: '#ef4444' },
   ];
 
   const expiringLicenses = drivers.filter((d) => {
@@ -442,14 +442,14 @@ export default function Dashboard() {
                     layout="vertical"
                     margin={{ left: 10, right: 30, top: 10, bottom: 10 }}
                   >
-                    <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis type="number" hide />
                     <YAxis
                       dataKey="name"
                       type="category"
                       axisLine={false}
                       tickLine={false}
-                      style={{ fontSize: '12px', fill: 'hsl(var(--foreground))', fontWeight: 500 }}
+                      style={{ fontSize: '12px', fill: 'currentColor', fontWeight: 500 }}
                       width={120}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
