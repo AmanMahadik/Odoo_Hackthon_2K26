@@ -10,12 +10,16 @@ export interface Vehicle {
   max_load_capacity: number;
   odometer: number;
   acquisition_cost: number;
-  status: 'Available' | 'On Trip' | 'In Shop' | 'Retired';
+  /** Pending = awaiting fleet manager approval after registration upload */
+  status: 'Available' | 'On Trip' | 'In Shop' | 'Retired' | 'Pending';
   fuel_type?: string;
   year?: number;
   color?: string;
   insurance_expiry?: string;
   fitness_expiry?: string;
+  /** Registration certificate / plate image (blob or storage URL) */
+  registration_doc_url?: string;
+  approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
 }
 
 export interface Driver {
@@ -26,9 +30,36 @@ export interface Driver {
   license_expiry_date: string;
   contact_number: string;
   safety_score: number;
-  status: 'Available' | 'On Trip' | 'Off Duty' | 'Suspended';
+  /** Inactive = new / not cleared; Pending = docs submitted awaiting approval */
+  status: 'Available' | 'On Trip' | 'Off Duty' | 'Suspended' | 'Inactive' | 'Pending';
   violations?: number;
   photo_url?: string;
+  /** License document image (blob or storage URL) */
+  license_doc_url?: string;
+  approval_status?: 'none' | 'pending' | 'approved' | 'rejected';
+}
+
+/** Inbox items for the notification drawer (approvals, dispatch, ops) */
+export interface AppNotification {
+  id: string;
+  type:
+    | 'driver_approval'
+    | 'vehicle_approval'
+    | 'dispatch'
+    | 'expiry'
+    | 'maintenance'
+    | 'trip'
+    | 'system';
+  title: string;
+  text: string;
+  time: string;
+  created_at: string;
+  read?: boolean;
+  /** Entity id for approve/reject actions */
+  entity_id?: string;
+  entity_type?: 'driver' | 'vehicle' | 'trip';
+  action_status?: 'open' | 'approved' | 'rejected' | 'info';
+  meta?: Record<string, string | number | undefined>;
 }
 
 export interface Trip {
