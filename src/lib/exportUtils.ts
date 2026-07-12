@@ -16,27 +16,63 @@ export const exportToCSV = (filename: string, data: any[]) => {
   }
 };
 
-export const exportToPDF = (reportData: any[], totals: any) => {
-  const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.innerHTML = getPDFTemplate(reportData, totals);
-  document.body.appendChild(container);
+export const exportToPDF = async (reportData: any[], totals: any) => {
+  const html = getPDFTemplate(reportData, totals);
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'absolute';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '0';
+  iframe.style.width = '1122px';
+  iframe.style.height = '793px';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.style.border = 'none';
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
 
-  const opt = {
-    margin: 0,
-    filename: 'TransitOps_Financial_Report.pdf',
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' as const }
+  const cleanup = () => {
+    if (iframe.parentElement) {
+      document.body.removeChild(iframe);
+    }
   };
 
-  import('html2pdf.js').then((html2pdfModule) => {
-    const html2pdf = html2pdfModule.default;
-    html2pdf().set(opt).from(container).save().then(() => {
-      document.body.removeChild(container);
-    });
-  });
+  const capture = async () => {
+    try {
+      const doc = iframe.contentDocument;
+      if (!doc) {
+        throw new Error('Iframe document unavailable');
+      }
+      const body = doc.body;
+      if (!body) {
+        throw new Error('Iframe body unavailable');
+      }
+
+      const html2canvasModule = await import('html2canvas');
+      const jsPDFModule = await import('jspdf');
+      const html2canvas = html2canvasModule.default;
+      const { jsPDF } = jsPDFModule;
+
+      const canvas = await html2canvas(body as HTMLElement, {
+        backgroundColor: '#0b1220',
+        scale: 2,
+        useCORS: true
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pdf = new jsPDF({ unit: 'in', format: 'a4', orientation: 'landscape' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height / canvas.width) * pdfWidth;
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('TransitOps_Financial_Report.pdf');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    } finally {
+      cleanup();
+    }
+  };
+
+  iframe.onload = capture;
+  setTimeout(capture, 500);
 };
 
 const getPDFTemplate = (reportData: any[], totals: any) => {
