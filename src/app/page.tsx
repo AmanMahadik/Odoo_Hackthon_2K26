@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { useTheme } from 'next-themes';
 import { db } from '@/lib/db';
 import { useRole } from '@/lib/roleContext';
 import { Vehicle, Driver, Trip, MaintenanceLog, MaintenancePrediction, mockDrivers } from '@/lib/mockData';
@@ -49,7 +50,8 @@ const mockPrediction: MaintenancePrediction = {
 };
 
 export default function Dashboard() {
-  const { role, canAccess, theme } = useRole();
+  const { role, canAccess } = useRole();
+  const { theme } = useTheme();
   const [dbMode, setDbMode] = useState('');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);

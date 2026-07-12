@@ -1,4 +1,3 @@
-import html2pdf from 'html2pdf.js';
 import Papa from 'papaparse';
 
 export const exportToCSV = (filename: string, data: any[]) => {
@@ -28,11 +27,14 @@ export const exportToPDF = (reportData: any[], totals: any) => {
     filename: 'TransitOps_Financial_Report.pdf',
     image: { type: 'jpeg' as const, quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' as const }
   };
 
-  html2pdf().set(opt).from(container).save().then(() => {
-    document.body.removeChild(container);
+  import('html2pdf.js').then((html2pdfModule) => {
+    const html2pdf = html2pdfModule.default;
+    html2pdf().set(opt).from(container).save().then(() => {
+      document.body.removeChild(container);
+    });
   });
 };
 

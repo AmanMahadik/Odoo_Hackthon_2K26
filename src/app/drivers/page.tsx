@@ -43,12 +43,8 @@ export default function DriversPage() {
   const fetchDrivers = async () => {
     setLoading(true);
     try {
-      const [data, profiles] = await Promise.all([
-        db.getDrivers(),
-        db.getDriverProfiles()
-      ]);
+      const data = await db.getDrivers();
       setDrivers(data);
-      setDriverProfiles(profiles);
     } catch (err) {
       console.error(err);
     } finally {

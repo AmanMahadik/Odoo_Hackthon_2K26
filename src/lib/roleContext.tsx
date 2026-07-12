@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { db } from './db';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useAuth, useClerk } from '@clerk/nextjs';
 
@@ -193,11 +194,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     router.push('/');
   };
 
-  const setTheme = (t: Theme) => {
-    localStorage.setItem('transitops_theme', t);
-    setThemeState(t);
-  };
-
   const setRole = (newRole: Role) => {
     setRoleState(newRole);
   };
@@ -215,10 +211,6 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (isSandboxMode) {
-      setProfile(prev => prev ? { ...prev, ...updates } : null);
-      return;
-    }
     if (user) {
       const data = await db.updateProfile(user.id, {
         ...updates,
@@ -232,7 +224,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   return (
     <RoleContext.Provider value={{ 
       role, setRole, user, profile, loading, 
-      signOut, canAccess 
+      signOut, canAccess, updateProfile 
     }}>
       {children}
     </RoleContext.Provider>

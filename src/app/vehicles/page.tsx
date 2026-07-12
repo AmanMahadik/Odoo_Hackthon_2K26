@@ -125,6 +125,16 @@ function VehiclesContent() {
     }
   };
 
+  const handleDeleteVehicle = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this vehicle?')) return;
+    try {
+      await db.deleteVehicle(id);
+      fetchVehicles();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const filteredVehicles = vehicles.filter(v => {
     const matchesSearch = v.registration_number.toLowerCase().includes(searchTerm.toLowerCase()) || v.model.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'All' || v.status === statusFilter;
@@ -241,18 +251,11 @@ function VehiclesContent() {
                           <Button variant="ghost" size="icon">
                             <Edit3 className="h-4 w-4" />
                           </Button>
-                          {canAccess('vehicles', 'delete') && vehicle.status !== 'Retired' && (
-                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleRetire(vehicle.id)}>
+                          {canAccess('vehicles', 'delete') && (
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteVehicle(vehicle.id)} title="Delete vehicle">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
-                          <button
-                            onClick={() => handleDeleteVehicle(v.id)}
-                            title="Delete vehicle"
-                            className="p-1.5 hover:bg-red-500/10 text-red-500 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
