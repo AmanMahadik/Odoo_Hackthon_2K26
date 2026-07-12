@@ -30,7 +30,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, profile } = useRole();
+  const { role, profile, signOut } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -187,12 +187,13 @@ export default function Shell({ children }: ShellProps) {
                           </div>
                         </div>
                         <Separator />
-                        <SignOutButton>
-                          <Button variant="destructive" className="w-full">
-                            <LogOut className="mr-2 h-4 w-4" />
-                            Sign Out
-                          </Button>
-                        </SignOutButton>
+                        <Button variant="destructive" className="w-full" onClick={() => {
+                          setSettingsOpen(false);
+                          signOut();
+                        }}>
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign Out
+                        </Button>
                       </div>
                     </TabsContent>
                     <TabsContent value="verification" className="p-4 border rounded-md mt-4">

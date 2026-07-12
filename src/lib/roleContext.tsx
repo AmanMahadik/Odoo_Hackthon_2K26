@@ -185,8 +185,11 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, [role, pathname, loading, router]);
 
   const signOut = async () => {
-    await clerkSignOut();
-    router.push('/');
+    try {
+      await clerkSignOut();
+    } finally {
+      window.location.href = '/sign-in';
+    }
   };
 
   const setRole = (newRole: Role) => {
