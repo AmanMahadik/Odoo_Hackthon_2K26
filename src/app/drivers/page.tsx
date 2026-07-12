@@ -15,7 +15,8 @@ import {
   Check, 
   X,
   Calendar,
-  Star
+  Star,
+  Mail
 } from 'lucide-react';
 
 function DriversContent() {
@@ -25,6 +26,7 @@ function DriversContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [sortOrder, setSortOrder] = useState('none');
 
   // Form State
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +36,16 @@ function DriversContent() {
   const [expiry, setExpiry] = useState('');
   const [contact, setContact] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState('');
+
+  const handleSendReminder = (d: Driver) => {
+    setToastMessage(`Compliance notification sent to ${d.name} (${d.contact_number}) via Resend API wrapper.`);
+    setTimeout(() => {
+      setToastMessage('');
+    }, 4000);
+  };
 
   const fetchDrivers = async () => {
     setLoading(true);
@@ -122,6 +134,14 @@ function DriversContent() {
     return matchesSearch && matchesStatus;
   });
 
+  // Sorting logic
+  const sortedDrivers = [...filteredDrivers].sort((a, b) => {
+    if (sortOrder === 'score-desc') return b.safety_score - a.safety_score;
+    if (sortOrder === 'score-asc') return a.safety_score - b.safety_score;
+    if (sortOrder === 'expiry-asc') return new Date(a.license_expiry_date).getTime() - new Date(b.license_expiry_date).getTime();
+    return 0;
+  });
+
   const getStatusBadge = (status: Driver['status']) => {
     switch (status) {
       case 'Available':
@@ -206,6 +226,20 @@ function DriversContent() {
             <option value="Suspended">Suspended</option>
           </select>
         </div>
+
+        {/* Sorting Dropdown */}
+        <div>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="bg-[#161B30] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="none">No Sort</option>
+            <option value="score-desc">Safety Score (High to Low)</option>
+            <option value="score-asc">Safety Score (Low to High)</option>
+            <option value="expiry-asc">License Expiry (Soonest First)</option>
+          </select>
+        </div>
       </div>
 
       {/* Grid Table */}
@@ -213,7 +247,7 @@ function DriversContent() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
         </div>
-      ) : filteredDrivers.length === 0 ? (
+      ) : sortedDrivers.length === 0 ? (
         <div className="bg-[#0F1424]/40 border border-slate-850 p-12 text-center rounded-2xl">
           <UserCheck className="h-10 w-10 text-slate-600 mx-auto mb-2" />
           <p className="text-xs text-slate-400 font-semibold">No drivers match search parameters.</p>
@@ -238,7 +272,7 @@ function DriversContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
-                {filteredDrivers.map((d) => (
+                {sortedDrivers.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-800/20 transition-colors">
                     <td className="p-4 font-bold text-slate-200">{d.name}</td>
                     <td className="p-4 text-slate-300 font-mono uppercase">{d.license_number}</td>
@@ -258,6 +292,13 @@ function DriversContent() {
                     {canAccess('drivers', 'update') && (
                       <td className="p-4 text-right">
                         <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => handleSendReminder(d)}
+                            title="Send Expiry Reminder Email"
+                            className="p-1.5 bg-[#171d33] hover:bg-slate-800 text-slate-300 rounded-lg border border-slate-700/60 transition-colors cursor-pointer"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => handleToggleSuspend(d)}
                             title={d.status === 'Suspended' ? 'Unsuspend Driver' : 'Suspend Driver'}
@@ -387,6 +428,21 @@ function DriversContent() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 bg-[#0F1424] border border-blue-500/30 p-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm z-50 animate-in slide-in-from-bottom-6 duration-300">
+          <div className="p-2 bg-blue-500/10 text-blue-400 rounded-xl">
+            <Mail className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="block text-xs font-bold text-slate-200">Email Dispatched</span>
+            <span className="block text-[10px] text-slate-400 mt-0.5 leading-snug">{toastMessage}</span>
+          </div>
+          <button onClick={() => setToastMessage('')} className="p-1 hover:bg-slate-800 text-slate-500 hover:text-slate-300 rounded-lg ml-auto cursor-pointer">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>

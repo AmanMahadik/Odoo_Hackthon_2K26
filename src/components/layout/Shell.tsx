@@ -50,10 +50,10 @@ export default function Shell({ children }: ShellProps) {
   return (
     <div className="flex min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-[#0F1424]/90 backdrop-blur-md flex flex-col justify-between fixed top-0 bottom-0 left-0 z-20">
+      <aside className="w-64 border-r border-slate-800 bg-[#0F1424]/90 backdrop-blur-md flex flex-col justify-between fixed top-0 bottom-0 left-0 z-20 print:hidden">
         <div>
           {/* Logo */}
-          <div className="p-6 flex items-center gap-3 border-b border-slate-800 bg-gradient-to-r from-blue-600/20 to-purple-600/0">
+          <div className="p-6 flex items-center gap-3 border-b border-slate-880 bg-gradient-to-r from-blue-600/20 to-purple-600/0">
             <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-lg shadow-lg shadow-blue-500/30">
               <Truck className="h-6 w-6 text-white" />
             </div>
@@ -122,9 +122,9 @@ export default function Shell({ children }: ShellProps) {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 pl-64 flex flex-col min-h-screen">
+      <div className="flex-1 pl-64 flex flex-col min-h-screen print:pl-0">
         {/* Top Navbar */}
-        <header className="h-16 border-b border-slate-800 bg-[#0F1424]/40 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-10">
+        <header className="h-16 border-b border-slate-800 bg-[#0F1424]/40 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-10 print:hidden">
           <div>
             <h1 className="text-lg font-bold text-slate-200">
               {pathname === '/' ? 'Operations Dashboard' : menuItems.find(m => m.path === pathname)?.name}
@@ -188,7 +188,7 @@ export default function Shell({ children }: ShellProps) {
         </header>
 
         {/* Content Wrapper */}
-        <main className="flex-grow p-8 bg-gradient-to-b from-[#0B0F19] to-[#080B12]">
+        <main className="flex-grow p-8 bg-gradient-to-b from-[#0B0F19] to-[#080B12] print:p-0 print:bg-transparent">
           {children}
         </main>
       </div>

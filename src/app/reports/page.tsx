@@ -167,17 +167,25 @@ export default function ReportsPage() {
         </div>
 
         {canAccess('reports', 'export') && (
-          <button
-            onClick={handleExportCSV}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/10 cursor-pointer"
-          >
-            <Download className="h-4 w-4" /> Export Report (CSV)
-          </button>
+          <div className="flex gap-3 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="px-4 py-2.5 bg-[#171d33] border border-slate-700/80 hover:bg-slate-850 text-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Download className="h-4 w-4 text-purple-400" /> Export PDF
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-blue-500/10 cursor-pointer"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
         )}
       </div>
 
       {/* Simulator Control Center Panel */}
-      <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+      <div className="bg-[#0F1424]/90 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 print:hidden">
         <div className="flex items-center gap-2 border-b border-slate-850 pb-3">
           <Sliders className="h-5 w-5 text-blue-400" />
           <div>

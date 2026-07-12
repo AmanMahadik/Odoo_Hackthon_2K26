@@ -25,6 +25,7 @@ function VehiclesContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [sortOrder, setSortOrder] = useState('none');
   
   // Form modal state
   const [isOpen, setIsOpen] = useState(false);
@@ -35,6 +36,39 @@ function VehiclesContent() {
   const [odometer, setOdometer] = useState('');
   const [cost, setCost] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Document Vault State
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [docVehicle, setDocVehicle] = useState<Vehicle | null>(null);
+  const [vehicleDocs, setVehicleDocs] = useState<{ name: string; size: string; date: string }[]>([
+    { name: 'RC_Registration_Certificate.pdf', size: '2.4 MB', date: '2026-07-01' },
+    { name: 'Commercial_Fleet_Insurance.pdf', size: '4.1 MB', date: '2026-07-02' },
+    { name: 'Emission_Compliance_PUC.pdf', size: '1.2 MB', date: '2026-07-03' }
+  ]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const openDocsModal = (v: Vehicle) => {
+    setDocVehicle(v);
+    setDocsOpen(true);
+  };
+
+  const handleMockUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setUploadingDoc(true);
+      setTimeout(() => {
+        setVehicleDocs(prev => [
+          ...prev,
+          { 
+            name: file.name, 
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`, 
+            date: new Date().toISOString().split('T')[0] 
+          }
+        ]);
+        setUploadingDoc(false);
+      }, 1000);
+    }
+  };
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -125,6 +159,14 @@ function VehiclesContent() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  // Sorting logic
+  const sortedVehicles = [...filteredVehicles].sort((a, b) => {
+    if (sortOrder === 'odo-asc') return a.odometer - b.odometer;
+    if (sortOrder === 'odo-desc') return b.odometer - a.odometer;
+    if (sortOrder === 'capacity-desc') return b.max_load_capacity - a.max_load_capacity;
+    return 0;
+  });
+
   const getStatusBadge = (status: Vehicle['status']) => {
     switch (status) {
       case 'Available':
@@ -202,6 +244,20 @@ function VehiclesContent() {
             <option value="Retired">Retired</option>
           </select>
         </div>
+
+        {/* Sorting Option */}
+        <div className="flex items-center gap-2">
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="bg-[#161B30] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="none">No Sort</option>
+            <option value="odo-asc">Odometer (Low to High)</option>
+            <option value="odo-desc">Odometer (High to Low)</option>
+            <option value="capacity-desc">Cargo Capacity (High to Low)</option>
+          </select>
+        </div>
       </div>
 
       {/* Table Data */}
@@ -209,7 +265,7 @@ function VehiclesContent() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
         </div>
-      ) : filteredVehicles.length === 0 ? (
+      ) : sortedVehicles.length === 0 ? (
         <div className="bg-[#0F1424]/40 border border-slate-850 p-12 text-center rounded-2xl">
           <Truck className="h-10 w-10 text-slate-600 mx-auto mb-2" />
           <p className="text-xs text-slate-400 font-semibold">No vehicles match the filters.</p>
@@ -231,7 +287,7 @@ function VehiclesContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
-                {filteredVehicles.map((v) => (
+                {sortedVehicles.map((v) => (
                   <tr key={v.id} className="hover:bg-slate-800/20 transition-colors">
                     <td className="p-4 font-bold text-slate-200">{v.registration_number}</td>
                     <td className="p-4 text-slate-300">{v.model}</td>
@@ -247,6 +303,13 @@ function VehiclesContent() {
                     {canAccess('vehicles', 'update') && (
                       <td className="p-4 text-right">
                         <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => openDocsModal(v)}
+                            title="Manage Vehicle Documents"
+                            className="p-1.5 hover:bg-blue-500/10 text-blue-400 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </button>
                           {v.status !== 'Retired' && (
                             <button
                               onClick={() => handleRetire(v.id)}
@@ -387,6 +450,68 @@ function VehiclesContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Document Vault Modal */}
+      {docsOpen && docVehicle && (
+        <div className="fixed inset-0 bg-[#06080F]/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0F1424] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-850 flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-slate-200 text-sm">Document Vault: {docVehicle.registration_number}</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Registration, Insurance & Permits scans</p>
+              </div>
+              <button 
+                onClick={() => setDocsOpen(false)}
+                className="p-1 text-slate-500 hover:text-slate-300 rounded-lg hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Document List */}
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {vehicleDocs.map((doc, idx) => (
+                  <div key={idx} className="p-3 bg-[#161B30] border border-slate-800 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-200 block truncate max-w-[200px]">{doc.name}</span>
+                      <span className="text-[10px] text-slate-500">{doc.size} • Uploaded: {doc.date}</span>
+                    </div>
+                    <a 
+                      href="#" 
+                      onClick={(e) => { e.preventDefault(); alert(`Simulated download of file: ${doc.name}`); }}
+                      className="text-[10px] text-blue-400 font-bold hover:underline"
+                    >
+                      Download
+                    </a>
+                  </div>
+                ))}
+              </div>
+
+              {/* Upload Input */}
+              <div className="border-t border-slate-850 pt-4 space-y-3">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase">Upload Document</label>
+                <div className="relative border border-dashed border-slate-800 hover:border-slate-700 rounded-xl p-6 text-center cursor-pointer hover:bg-slate-800/10 transition-all">
+                  <input
+                    type="file"
+                    onChange={handleMockUpload}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <div className="text-xs text-slate-400 space-y-1">
+                    <span className="block font-semibold text-blue-400">Click to upload file</span>
+                    <span className="block text-[10px] text-slate-500">PDF, PNG, JPG (Max 5MB)</span>
+                  </div>
+                </div>
+                {uploadingDoc && (
+                  <div className="flex items-center gap-2 justify-center text-xs text-blue-400">
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-500"></div>
+                    <span>Uploading scan to Supabase Document Vault...</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
