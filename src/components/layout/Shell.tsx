@@ -30,7 +30,7 @@ interface ShellProps {
 
 export default function Shell({ children }: ShellProps) {
   const pathname = usePathname();
-  const { role, profile, signOut } = useRole();
+  const { role, profile, signOut, loading: roleLoading } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -65,54 +65,85 @@ export default function Shell({ children }: ShellProps) {
               <img src="/icon/light.png" alt="TransitOps" className="h-8 w-auto dark:hidden shrink-0" />
               <img src="/icon/dark.png" alt="TransitOps" className="h-8 w-auto hidden dark:block shrink-0" />
               <span className="text-base md:text-lg tracking-tight font-medium truncate">TransitOps</span>
-              <Badge variant="secondary" className="ml-1.5 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0 font-normal">
-                {role}
-              </Badge>
+              {roleLoading || !role ? (
+                <span
+                  className="ml-1.5 hidden sm:inline-flex h-5 w-[88px] rounded-full bg-muted animate-pulse shrink-0"
+                  aria-label="Loading role"
+                />
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className="ml-1.5 text-[9px] uppercase tracking-wider py-0 leading-tight hidden sm:flex shrink-0 font-normal"
+                >
+                  {role}
+                </Badge>
+              )}
             </Link>
 
             {/* Desktop Tabs Navigation (Center) */}
             <nav className="hidden md:flex items-center space-x-1 bg-muted/50 border border-border rounded-full p-1 shadow-sm absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-              {sidebarItems.map((item) => {
-                const Icon = iconMap[item.icon] || LayoutDashboard;
-                const isActive = pathname === item.path || (item.subItems && item.subItems.some(sub => sub.path === pathname));
-                
-                if (item.subItems) {
-                  return (
-                    <DropdownMenu key={item.name}>
-                      <DropdownMenuTrigger className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full outline-none cursor-pointer pointer-events-auto ${isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>
-                         <Icon className="h-4 w-4" />
-                         {item.name}
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="center" className="w-48 rounded-xl z-[100]">
-                         {item.subItems.map(sub => {
-                           const SubIcon = iconMap[sub.icon] || LayoutDashboard;
-                           return (
-                             <DropdownMenuItem key={sub.path} className="rounded-lg p-0">
-                               <Link href={sub.path} className="flex items-center gap-2 cursor-pointer w-full px-2 py-1.5">
-                                 <SubIcon className="h-4 w-4 text-muted-foreground" />
-                                 {sub.name}
-                               </Link>
-                             </DropdownMenuItem>
-                           )
-                         })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )
-                }
+              {roleLoading || !role ? (
+                <>
+                  <span className="h-8 w-24 rounded-full bg-muted animate-pulse" />
+                  <span className="h-8 w-28 rounded-full bg-muted animate-pulse" />
+                  <span className="h-8 w-20 rounded-full bg-muted animate-pulse" />
+                </>
+              ) : (
+                sidebarItems.map((item) => {
+                  const Icon = iconMap[item.icon] || LayoutDashboard;
+                  const isActive =
+                    pathname === item.path ||
+                    (item.subItems && item.subItems.some((sub) => sub.path === pathname));
 
-                return (
-                  <Link
-                    key={item.path + item.name}
-                    href={item.path!}
-                    className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full pointer-events-auto ${
-                      isActive ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.name}
-                  </Link>
-                );
-              })}
+                  if (item.subItems) {
+                    return (
+                      <DropdownMenu key={item.name}>
+                        <DropdownMenuTrigger
+                          className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full outline-none cursor-pointer pointer-events-auto ${
+                            isActive
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.name}
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-48 rounded-xl z-[100]">
+                          {item.subItems.map((sub) => {
+                            const SubIcon = iconMap[sub.icon] || LayoutDashboard;
+                            return (
+                              <DropdownMenuItem key={sub.path} className="rounded-lg p-0">
+                                <Link
+                                  href={sub.path}
+                                  className="flex items-center gap-2 cursor-pointer w-full px-2 py-1.5"
+                                >
+                                  <SubIcon className="h-4 w-4 text-muted-foreground" />
+                                  {sub.name}
+                                </Link>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={item.path + item.name}
+                      href={item.path!}
+                      className={`relative flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all rounded-full pointer-events-auto ${
+                        isActive
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.name}
+                    </Link>
+                  );
+                })
+              )}
             </nav>
 
             <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0 ml-auto z-10">
@@ -163,7 +194,11 @@ export default function Shell({ children }: ShellProps) {
                           </Avatar>
                           <div>
                             <h4 className="text-lg font-medium">{profile?.full_name || 'Auth User'}</h4>
-                            <Badge className="mt-1">{role}</Badge>
+                            {roleLoading || !role ? (
+                              <span className="mt-1 inline-block h-5 w-24 rounded-full bg-muted animate-pulse" />
+                            ) : (
+                              <Badge className="mt-1 font-normal">{role}</Badge>
+                            )}
                             {profile?.email && (
                               <p className="text-xs text-muted-foreground mt-1">{profile.email}</p>
                             )}
@@ -260,7 +295,13 @@ export default function Shell({ children }: ShellProps) {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Role access</span>
-                          <span className="font-medium">{role}</span>
+                          <span className="font-medium">
+                            {roleLoading || !role ? (
+                              <span className="inline-block h-4 w-20 rounded bg-muted animate-pulse align-middle" />
+                            ) : (
+                              role
+                            )}
+                          </span>
                         </div>
                       </div>
                     </section>
@@ -304,7 +345,14 @@ export default function Shell({ children }: ShellProps) {
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-border bg-card">
           <nav className="flex flex-col p-4 space-y-2">
-            {sidebarItems.map((item) => {
+            {roleLoading || !role ? (
+              <div className="space-y-2 py-2">
+                <div className="h-9 rounded-md bg-muted animate-pulse" />
+                <div className="h-9 rounded-md bg-muted animate-pulse w-4/5" />
+                <div className="h-9 rounded-md bg-muted animate-pulse w-3/5" />
+              </div>
+            ) : (
+            sidebarItems.map((item) => {
               const Icon = iconMap[item.icon] || LayoutDashboard;
               const isActive = pathname === item.path || (item.subItems && item.subItems.some(sub => sub.path === pathname));
               
@@ -354,7 +402,8 @@ export default function Shell({ children }: ShellProps) {
                   {item.name}
                 </Link>
               );
-            })}
+            })
+            )}
           </nav>
         </div>
       )}
@@ -363,7 +412,13 @@ export default function Shell({ children }: ShellProps) {
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 md:px-6 pt-5 md:pt-7 pb-6 md:pb-8">
         {pathname !== '/' && (
           <div className="mb-5 flex items-center justify-between">
-            <h1 className="text-xl tracking-tight text-foreground font-medium">{currentPage}</h1>
+            <h1 className="text-xl tracking-tight text-foreground font-medium">
+              {roleLoading ? (
+                <span className="inline-block h-6 w-40 rounded bg-muted animate-pulse" />
+              ) : (
+                currentPage
+              )}
+            </h1>
           </div>
         )}
         {children}

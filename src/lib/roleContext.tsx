@@ -19,7 +19,8 @@ interface UserProfile {
 }
 
 interface RoleContextType {
-  role: Role;
+  /** null while profile is still loading — never assume Fleet Manager */
+  role: Role | null;
   setRole: (role: Role) => void;
   user: any;
   profile: UserProfile | null;
@@ -44,65 +45,132 @@ export interface SidebarItem {
   subItems?: { name: string; path: string; icon: string; badge?: 'alert' | 'count' }[];
 }
 
-export function getRoleSidebar(role: Role): SidebarItem[] {
+export function getRoleSidebar(role: Role | null): SidebarItem[] {
+  if (!role) return [];
+
   switch (role) {
     case 'Fleet Manager':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-        { 
-          name: 'Operations', icon: 'Briefcase',
+        {
+          name: 'Operations',
+          icon: 'Briefcase',
           subItems: [
             { name: 'Vehicles', path: '/vehicles', icon: 'Truck' },
             { name: 'Drivers', path: '/drivers', icon: 'Users' },
             { name: 'Trips', path: '/trips', icon: 'Navigation' },
-          ]
+          ],
         },
         {
-          name: 'Service', icon: 'Wrench',
+          name: 'Service',
+          icon: 'Wrench',
           subItems: [
             { name: 'Maintenance', path: '/maintenance', icon: 'Wrench', badge: 'alert' },
             { name: 'Fuel & Expenses', path: '/fuel-expenses', icon: 'DollarSign' },
-          ]
+          ],
         },
         {
-          name: 'Insights', icon: 'BarChart3',
+          name: 'Insights',
+          icon: 'BarChart3',
           subItems: [
             { name: 'Reports', path: '/reports', icon: 'BarChart3' },
             { name: 'Prediction', path: '/ai-predictions', icon: 'Sparkles' },
             { name: 'Economics', path: '/economic-simulator', icon: 'TrendingUp' },
-          ]
-        }
+          ],
+        },
       ];
+
     case 'Dispatcher':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-        { 
-          name: 'Operations', icon: 'Briefcase',
+        {
+          name: 'Operations',
+          icon: 'Briefcase',
           subItems: [
             { name: 'Dispatch Board', path: '/trips', icon: 'Navigation' },
             { name: 'Driver Availability', path: '/drivers', icon: 'Users' },
             { name: 'Vehicle Availability', path: '/vehicles', icon: 'Truck' },
-          ]
-        }
+          ],
+        },
       ];
+
+    case 'Safety Officer':
+      return [
+        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+        {
+          name: 'Compliance',
+          icon: 'ShieldCheck',
+          subItems: [
+            { name: 'Safety Command', path: '/safety-command', icon: 'ShieldAlert' },
+            { name: 'Drivers', path: '/drivers', icon: 'Users' },
+            { name: 'Vehicles', path: '/vehicles', icon: 'Truck' },
+          ],
+        },
+        {
+          name: 'Service',
+          icon: 'Wrench',
+          subItems: [
+            { name: 'Maintenance', path: '/maintenance', icon: 'Wrench' },
+          ],
+        },
+      ];
+
+    case 'Financial Analyst':
+      return [
+        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+        {
+          name: 'Finance',
+          icon: 'DollarSign',
+          subItems: [
+            { name: 'Fuel & Expenses', path: '/fuel-expenses', icon: 'DollarSign' },
+            { name: 'Reports & ROI', path: '/reports', icon: 'BarChart3' },
+            { name: 'War Room', path: '/financial-war-room', icon: 'Monitor' },
+          ],
+        },
+        {
+          name: 'Insights',
+          icon: 'TrendingUp',
+          subItems: [
+            { name: 'Economics', path: '/economic-simulator', icon: 'TrendingUp' },
+          ],
+        },
+      ];
+
+    case 'Maintenance Technician':
+      return [
+        { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
+        {
+          name: 'Workshop',
+          icon: 'Wrench',
+          subItems: [
+            { name: 'Work Orders', path: '/maintenance', icon: 'Wrench' },
+            { name: 'Fleet Units', path: '/vehicles', icon: 'Truck' },
+            { name: 'Predictions', path: '/ai-predictions', icon: 'Sparkles' },
+          ],
+        },
+      ];
+
     case 'Driver':
       return [
         { name: 'Dashboard', path: '/', icon: 'LayoutDashboard' },
-        { 
-          name: 'My Work', icon: 'Briefcase',
+        {
+          name: 'My Work',
+          icon: 'Briefcase',
           subItems: [
             { name: 'My Trips', path: '/trips', icon: 'Navigation' },
             { name: 'My Vehicle', path: '/vehicles', icon: 'Truck' },
-          ]
+          ],
         },
         {
-          name: 'Service', icon: 'Wrench',
+          name: 'Service',
+          icon: 'Wrench',
           subItems: [
             { name: 'Log Expense', path: '/fuel-expenses', icon: 'DollarSign' },
             { name: 'Report Issue', path: '/maintenance', icon: 'Wrench' },
-          ]
-        }
+          ],
+        },
       ];
+
     default:
       return [{ name: 'Dashboard', path: '/', icon: 'LayoutDashboard' }];
   }
@@ -127,7 +195,8 @@ export const routePermissions: Record<string, Role[]> = {
   '/safety-command': ['Fleet Manager', 'Safety Officer'],
 };
 
-export function canAccessRoute(role: Role, path: string): boolean {
+export function canAccessRoute(role: Role | null, path: string): boolean {
+  if (!role) return false;
   const allowedRoles = routePermissions[path];
   if (!allowedRoles) return true; // Unknown routes are open
   return allowedRoles.includes(role);
@@ -138,7 +207,8 @@ export function canAccessRoute(role: Role, path: string): boolean {
 // ============================================
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = useState<Role>('Fleet Manager');
+  // null until profile resolves — avoids flashing "Fleet Manager" on reload
+  const [role, setRoleState] = useState<Role | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const router = useRouter();
@@ -150,22 +220,26 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function fetchProfile(userId: string) {
+      setProfileLoading(true);
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single();
-        
+
         if (!error && data) {
           setProfile(data);
-          setRoleState(data.role);
+          setRoleState((data.role as Role) || null);
         } else {
-          // New user -> no profile mapped yet -> redirect to onboarding
+          // New user — no profile yet
           setProfile(null);
+          setRoleState(null);
         }
       } catch (err) {
         console.error(err);
+        setProfile(null);
+        setRoleState(null);
       } finally {
         setProfileLoading(false);
       }
@@ -175,6 +249,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
       fetchProfile(user.id);
     } else if (isLoaded && !isSignedIn) {
       setProfile(null);
+      setRoleState(null);
       setProfileLoading(false);
     }
   }, [isLoaded, isSignedIn, user]);
@@ -183,23 +258,21 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !isSignedIn) return;
     if (pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up')) return;
-    
-    // If user has no profile, force them to onboarding
+
     if (!profile && pathname !== '/onboarding') {
       router.push('/onboarding');
       return;
     }
 
-    // If they have a profile, don't let them go back to onboarding
     if (profile && pathname === '/onboarding') {
       router.push('/');
       return;
     }
 
-    if (pathname !== '/onboarding' && !canAccessRoute(role, pathname)) {
+    if (pathname !== '/onboarding' && role && !canAccessRoute(role, pathname)) {
       router.push('/');
     }
-  }, [role, pathname, loading, router, profile]);
+  }, [role, pathname, loading, router, profile, isSignedIn]);
 
   const signOut = async () => {
     try {
@@ -214,10 +287,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   const canAccess = (resource: string, action: string): boolean => {
-    // Normalize in case profile role has slight mismatches
-    const r = (role || '').trim() as Role;
+    if (!role) return false;
+    const r = role.trim() as Role;
 
-    // Fleet Manager: full control of operations
     if (r === 'Fleet Manager') return true;
 
     switch (r) {
@@ -236,30 +308,28 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
         if (resource === 'drivers') return ['read', 'update', 'create'].includes(action);
         if (resource === 'vehicles') return ['read', 'update'].includes(action);
         if (resource === 'maintenance') return action === 'read';
+        if (resource === 'safety' || resource === 'reports') return action === 'read';
         return false;
       case 'Financial Analyst':
-        if (resource === 'expenses' || resource === 'fuel') return ['create', 'read', 'delete'].includes(action);
+        if (resource === 'expenses' || resource === 'fuel') return ['create', 'read', 'update', 'delete'].includes(action);
         if (resource === 'reports') return ['read', 'export'].includes(action);
         if (resource === 'vehicles' || resource === 'trips' || resource === 'maintenance') return action === 'read';
         return false;
       case 'Maintenance Technician':
         if (resource === 'maintenance') return ['create', 'read', 'update', 'delete'].includes(action);
         if (resource === 'vehicles') return ['read', 'update'].includes(action);
+        if (resource === 'predictions' || resource === 'ai') return action === 'read';
         return false;
       default:
-        // Fail-open for unknown mapped manager-like roles so ops never brick
-        if (String(role).toLowerCase().includes('fleet') || String(role).toLowerCase().includes('manager')) {
-          return true;
-        }
         return false;
     }
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (user) {
+    if (user && profile) {
       const data = await db.updateProfile(user.id, {
-        role: profile?.role || 'Fleet Manager',
-        ...updates
+        role: profile.role,
+        ...updates,
       });
       setProfile(data);
       setRoleState(data.role);
@@ -267,10 +337,18 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <RoleContext.Provider value={{ 
-      role, setRole, user, profile, loading, 
-      signOut, canAccess, updateProfile 
-    }}>
+    <RoleContext.Provider
+      value={{
+        role,
+        setRole,
+        user,
+        profile,
+        loading,
+        signOut,
+        canAccess,
+        updateProfile,
+      }}
+    >
       {children}
     </RoleContext.Provider>
   );
