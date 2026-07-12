@@ -16,6 +16,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { useTheme } from "next-themes";
+
 
 // Icon lookup map
 const iconMap: Record<string, LucideIcon> = {
@@ -31,6 +33,12 @@ export default function Shell({ children }: ShellProps) {
   const { role, profile } = useRole();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Notifications feed (would be fetched from API in real implementation)
   const notifications: any[] = [];
@@ -219,9 +227,27 @@ export default function Shell({ children }: ShellProps) {
                         <h3 className="font-semibold text-lg">Appearance</h3>
                         <p className="text-sm text-muted-foreground">Customize the interface theme.</p>
                         <div className="flex gap-4">
-                          <Button variant="outline" className="flex-1">Light</Button>
-                          <Button variant="default" className="flex-1">Dark</Button>
-                          <Button variant="outline" className="flex-1">System</Button>
+                          <Button 
+                            variant={mounted && theme === 'light' ? 'default' : 'outline'} 
+                            className="flex-1"
+                            onClick={() => setTheme('light')}
+                          >
+                            Light
+                          </Button>
+                          <Button 
+                            variant={mounted && theme === 'dark' ? 'default' : 'outline'} 
+                            className="flex-1"
+                            onClick={() => setTheme('dark')}
+                          >
+                            Dark
+                          </Button>
+                          <Button 
+                            variant={mounted && theme === 'system' ? 'default' : 'outline'} 
+                            className="flex-1"
+                            onClick={() => setTheme('system')}
+                          >
+                            System
+                          </Button>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">*Note: The theme applies standard Shadcn tokens.</p>
                       </div>
