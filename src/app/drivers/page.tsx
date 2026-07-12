@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DriversPage() {
   const { canAccess } = useRole();
@@ -32,11 +33,14 @@ export default function DriversPage() {
   
   // Form modal state
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [licenseNum, setLicenseNum] = useState('');
   const [licenseType, setLicenseType] = useState('');
   const [contact, setContact] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [status, setStatus] = useState<Driver['status']>('Available');
+  const [safetyScore, setSafetyScore] = useState('100');
   const [errorMsg, setErrorMsg] = useState('');
   const [isOCRValidated, setIsOCRValidated] = useState(false);
 
@@ -56,6 +60,38 @@ export default function DriversPage() {
     fetchDrivers();
   }, []);
 
+  const resetForm = () => {
+    setName('');
+    setLicenseNum('');
+    setLicenseType('');
+    setContact('');
+    setExpiry('');
+    setStatus('Available');
+    setSafetyScore('100');
+    setEditingId(null);
+    setIsOCRValidated(false);
+    setErrorMsg('');
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setIsOpen(true);
+  };
+
+  const openEdit = (d: Driver) => {
+    setEditingId(d.id);
+    setName(d.name);
+    setLicenseNum(d.license_number);
+    setLicenseType(d.license_category);
+    setContact(d.contact_number);
+    setExpiry(d.license_expiry_date);
+    setStatus(d.status);
+    setSafetyScore(String(d.safety_score));
+    setIsOCRValidated(false);
+    setErrorMsg('');
+    setIsOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -66,25 +102,31 @@ export default function DriversPage() {
     }
 
     try {
-      await db.createDriver({
+      const payload = {
         name: name.trim(),
         license_number: licenseNum.trim().toUpperCase(),
         license_category: licenseType,
         contact_number: contact,
         license_expiry_date: expiry,
-        status: 'Available',
-        safety_score: 100 // default for new drivers
-      });
-      
-      setName(''); setLicenseNum(''); setLicenseType(''); setContact(''); setExpiry(''); setIsOCRValidated(false);
+        status,
+        safety_score: Number(safetyScore) || 100,
+      };
+
+      if (editingId) {
+        await db.updateDriver(editingId, payload);
+      } else {
+        await db.createDriver({ ...payload, status: 'Available', safety_score: 100 });
+      }
+
+      resetForm();
       setIsOpen(false);
       fetchDrivers();
     } catch (err: any) {
-      let msg = err.message || 'Error creating driver.';
+      let msg = err.message || 'Error saving driver.';
       if (msg.includes('duplicate key') || msg.includes('drivers_license_number_key') || err.code === '23505') {
         msg = `A driver with license number ${licenseNum.toUpperCase()} already exists in the database.`;
       } else if (msg.includes('row-level security') || err.code === '42501') {
-        msg = 'Permission denied: Only Fleet Managers and Safety Officers are authorized to register drivers.';
+        msg = 'Permission denied: Only Fleet Managers and Safety Officers are authorized to manage drivers.';
       }
       setErrorMsg(msg);
     }
@@ -126,7 +168,7 @@ export default function DriversPage() {
         </div>
         
         {canAccess('drivers', 'create') && (
-          <Button onClick={() => setIsOpen(true)} className="gap-2">
+          <Button onClick={openCreate} className="gap-2">
             <Plus className="h-4 w-4" /> Add Driver
           </Button>
         )}
@@ -179,13 +221,17 @@ export default function DriversPage() {
                       <TableCell>{driver.contact_number}</TableCell>
                       <TableCell>{getStatusBadge(driver.status)}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon">
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon">
-                            <Edit3 className="h-4 w-4" />
-                          </Button>
+                        <div className="flex justify-end gap-1">
+                          {canAccess('drivers', 'update') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Edit driver"
+                              onClick={() => openEdit(driver)}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -197,15 +243,27 @@ export default function DriversPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open);
+          if (!open) resetForm();
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Register New Driver</DialogTitle>
-            <DialogDescription>Scan a driver's license to auto-fill Govt details, or enter manually.</DialogDescription>
+            <DialogTitle>{editingId ? 'Edit Driver' : 'Register New Driver'}</DialogTitle>
+            <DialogDescription>
+              {editingId
+                ? 'Update license, contact, safety score, and duty status.'
+                : "Scan a driver's license to auto-fill, or enter manually."}
+            </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end mt-2">
-            <DriverLicenseScanner onAutoFill={handleOCRAutoFill} />
-          </div>
+          {!editingId && (
+            <div className="flex justify-end mt-2">
+              <DriverLicenseScanner onAutoFill={handleOCRAutoFill} />
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {errorMsg && (
               <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-md flex gap-2">
@@ -214,36 +272,74 @@ export default function DriversPage() {
             )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Full Name</label>
-              <Input value={name} onChange={e => setName(e.target.value)} required placeholder="Aman Mahadik" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Aman Mahadik" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">License Number</label>
-                <div className="flex gap-2 items-center">
-                  <Input value={licenseNum} onChange={e => setLicenseNum(e.target.value)} required placeholder="MH042023000" />
-                </div>
+                <Input
+                  value={licenseNum}
+                  onChange={(e) => setLicenseNum(e.target.value)}
+                  required
+                  placeholder="MH042023000"
+                  disabled={!!editingId}
+                />
               </div>
               <div className="space-y-2 flex items-end">
-                {isOCRValidated && <Badge className="bg-emerald-500 hover:bg-emerald-600 h-10 w-full justify-center flex gap-2"><CheckCircle2 className="h-4 w-4"/> DB Verified</Badge>}
+                {isOCRValidated && (
+                  <Badge className="bg-emerald-500 hover:bg-emerald-600 h-10 w-full justify-center flex gap-2">
+                    <CheckCircle2 className="h-4 w-4" /> Verified
+                  </Badge>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">License Category</label>
-                <Input value={licenseType} onChange={e => setLicenseType(e.target.value)} required placeholder="HMV, LMV" />
+                <Input value={licenseType} onChange={(e) => setLicenseType(e.target.value)} required placeholder="HMV, LMV" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Expiry Date</label>
-                <Input type="date" value={expiry} onChange={e => setExpiry(e.target.value)} required />
+                <Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} required />
               </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Contact Number</label>
-              <Input type="tel" value={contact} onChange={e => setContact(e.target.value)} required placeholder="+91 9876543210" />
+              <Input type="tel" value={contact} onChange={(e) => setContact(e.target.value)} required placeholder="+91 9876543210" />
             </div>
+            {editingId && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select value={status} onValueChange={(v: any) => v && setStatus(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Available">Available</SelectItem>
+                      <SelectItem value="On Trip">On Trip</SelectItem>
+                      <SelectItem value="Off Duty">Off Duty</SelectItem>
+                      <SelectItem value="Suspended">Suspended</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Safety Score</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={safetyScore}
+                    onChange={(e) => setSafetyScore(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-3 mt-6">
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Driver</Button>
+              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">{editingId ? 'Save changes' : 'Save Driver'}</Button>
             </div>
           </form>
         </DialogContent>
