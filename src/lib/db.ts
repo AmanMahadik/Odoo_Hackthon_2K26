@@ -1,8 +1,32 @@
 import { supabase } from './supabase';
 import { 
-  Vehicle, Driver, Trip, MaintenanceLog, FuelLog, Expense,
+  Vehicle, Driver, Trip, MaintenanceLog, FuelLog, Expense, AppNotification,
   mockVehicles, mockDrivers, mockTrips, mockMaintenanceLogs, mockFuelLogs, mockExpenses 
 } from './mockData';
+
+const NOTIF_KEY = 'notifications_inbox';
+
+function pushInboxNotification(n: Omit<AppNotification, 'id' | 'created_at' | 'time'> & { id?: string; time?: string }) {
+  if (typeof window === 'undefined') return;
+  const list = getSandboxState<AppNotification>(NOTIF_KEY, []);
+  const item: AppNotification = {
+    id: n.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    type: n.type,
+    title: n.title,
+    text: n.text,
+    time: n.time || 'Just now',
+    created_at: new Date().toISOString(),
+    read: false,
+    entity_id: n.entity_id,
+    entity_type: n.entity_type,
+    action_status: n.action_status ?? 'open',
+    meta: n.meta,
+  };
+  list.unshift(item);
+  // Keep last 80
+  saveSandboxState(NOTIF_KEY, list.slice(0, 80));
+  return item;
+}
 
 // Safe helper to check if a string matches PostgreSQL UUID format
 const isUuid = (val: string): boolean => typeof val === 'string' && val.length === 36 && val.includes('-');
@@ -88,21 +112,59 @@ export const db = {
   },
 
   async createVehicle(v: Omit<Vehicle, 'id'>): Promise<Vehicle> {
+    // New vehicles always Pending (not active) until fleet manager accepts registration
+    const ocr = v.ocr_snapshot || {
+      registration_number: v.registration_number,
+      model: v.model,
+      type: v.type,
+      max_load_capacity: String(v.max_load_capacity),
+      odometer: String(v.odometer),
+    };
+    const record: Omit<Vehicle, 'id'> = {
+      ...v,
+      status: 'Pending',
+      approval_status: 'pending',
+      ocr_snapshot: ocr,
+    };
+
+    const notifyVehicle = (vehicle: Vehicle) => {
+      pushInboxNotification({
+        type: 'vehicle_approval',
+        title: 'Vehicle registration review',
+        text: `${vehicle.registration_number} registration submitted — review image & OCR data.`,
+        entity_id: vehicle.id,
+        entity_type: 'vehicle',
+        action_status: 'open',
+        meta: {
+          doc: vehicle.registration_doc_url,
+          registration: vehicle.registration_number,
+          model: vehicle.model,
+          type: vehicle.type,
+          capacity: String(vehicle.max_load_capacity),
+          odometer: String(vehicle.odometer),
+          acquisition_cost: String(vehicle.acquisition_cost),
+          ...ocr,
+        },
+      });
+    };
+
     if (isLiveMode) {
       try {
-        const { data, error } = await supabase.from('vehicles').insert([v]).select().single();
+        const { data, error } = await supabase.from('vehicles').insert([record]).select().single();
         if (error) throw error;
-        if (data) return data;
+        if (data) {
+          notifyVehicle(data);
+          return data;
+        }
       } catch (err: any) {
         console.error("Create vehicle Supabase error:", err.message || err);
-        throw err;
       }
     }
-    // Sandbox
     const vehicles = getSandboxState<Vehicle>('vehicles', mockVehicles);
-    const newVehicle: Vehicle = { ...v, id: `v_${Date.now()}` };
+    const newVehicle: Vehicle = { ...record, id: `v_${Date.now()}` };
     vehicles.push(newVehicle);
     saveSandboxState('vehicles', vehicles);
+    notifyVehicle(newVehicle);
     return newVehicle;
   },
 
@@ -139,20 +201,61 @@ export const db = {
   },
 
   async createDriver(d: Omit<Driver, 'id'>): Promise<Driver> {
+    // New drivers: Inactive if no license image; Pending once image is submitted (still not active)
+    const hasDoc = Boolean(d.license_doc_url);
+    const ocr = d.ocr_snapshot || {
+      name: d.name,
+      license_number: d.license_number,
+      license_category: d.license_category,
+      license_expiry_date: d.license_expiry_date,
+      contact_number: d.contact_number,
+    };
+    const record: Omit<Driver, 'id'> = {
+      ...d,
+      status: hasDoc ? 'Pending' : 'Inactive',
+      approval_status: hasDoc ? 'pending' : 'none',
+      safety_score: d.safety_score ?? 100,
+      ocr_snapshot: ocr,
+    };
+
+    const notifyDriver = (driver: Driver) => {
+      if (!driver.license_doc_url) return;
+      pushInboxNotification({
+        type: 'driver_approval',
+        title: 'Driver activation review',
+        text: `${driver.name} is not active — review license image & OCR to activate.`,
+        entity_id: driver.id,
+        entity_type: 'driver',
+        action_status: 'open',
+        meta: {
+          doc: driver.license_doc_url,
+          name: driver.name,
+          license_number: driver.license_number,
+          license_category: driver.license_category,
+          license_expiry_date: driver.license_expiry_date,
+          contact_number: driver.contact_number,
+          ...ocr,
+        },
+      });
+    };
+
     if (isLiveMode) {
       try {
-        const { data, error } = await supabase.from('drivers').insert([d]).select().single();
+        const { data, error } = await supabase.from('drivers').insert([record]).select().single();
         if (error) throw error;
-        if (data) return data;
+        if (data) {
+          notifyDriver(data);
+          return data;
+        }
       } catch (err: any) {
         console.error("Create driver Supabase error:", err.message || err);
-        throw err;
       }
     }
     const drivers = getSandboxState<Driver>('drivers', mockDrivers);
-    const newDriver: Driver = { ...d, id: `d_${Date.now()}` };
+    const newDriver: Driver = { ...record, id: `d_${Date.now()}` };
     drivers.push(newDriver);
     saveSandboxState('drivers', drivers);
+    notifyDriver(newDriver);
     return newDriver;
   },
 
@@ -690,76 +793,329 @@ export const db = {
     return true;
   },
 
-  // NOTIFICATIONS (generated dynamically from data state to satisfy the dynamic rule)
-  async getNotifications(): Promise<{ id: string; type: string; text: string; time: string }[]> {
-    const notificationsList: { id: string; type: string; text: string; time: string }[] = [];
-    
+  // NOTIFICATIONS — inbox (approvals) + live ops signals
+  async getNotifications(): Promise<AppNotification[]> {
+    const inbox = getSandboxState<AppNotification>(NOTIF_KEY, []);
+    const generated: AppNotification[] = [];
+    const now = new Date().toISOString();
+
     try {
       const drivers = await this.getDrivers();
       const today = new Date();
-      drivers.forEach(d => {
+      drivers.forEach((d) => {
+        if (d.status === 'Pending' || d.approval_status === 'pending') {
+          // Ensure pending drivers always surface if inbox was cleared
+          if (!inbox.some((n) => n.entity_id === d.id && n.type === 'driver_approval' && n.action_status === 'open')) {
+            generated.push({
+              id: `gen_driver_${d.id}`,
+              type: 'driver_approval',
+              title: 'Driver status approval',
+              text: `${d.name} is pending activation — review license documents.`,
+              time: 'Pending',
+              created_at: now,
+              read: false,
+              entity_id: d.id,
+              entity_type: 'driver',
+              action_status: 'open',
+              meta: {
+                name: d.name,
+                license_number: d.license_number,
+                license_category: d.license_category,
+                license_expiry_date: d.license_expiry_date,
+                contact_number: d.contact_number,
+                doc: d.license_doc_url,
+                ...(d.ocr_snapshot || {}),
+              },
+            });
+          }
+        }
         const expiry = new Date(d.license_expiry_date);
         const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         if (diffDays < 0) {
-          notificationsList.push({
+          generated.push({
             id: `notif_exp_${d.id}`,
             type: 'expiry',
-            text: `Driver ${d.name}'s license has EXPIRED!`,
-            time: 'Expired status'
+            title: 'License expired',
+            text: `Driver ${d.name}'s license has expired.`,
+            time: 'Expired',
+            created_at: now,
+            entity_type: 'driver',
+            entity_id: d.id,
+            action_status: 'info',
           });
         } else if (diffDays <= 30) {
-          notificationsList.push({
-            id: `notif_exp_${d.id}`,
+          generated.push({
+            id: `notif_exp_soon_${d.id}`,
             type: 'expiry',
-            text: `Driver ${d.name}'s license is expiring in ${diffDays} days!`,
-            time: 'Action required'
+            title: 'License expiring soon',
+            text: `Driver ${d.name}'s license expires in ${diffDays} days.`,
+            time: 'Action required',
+            created_at: now,
+            entity_type: 'driver',
+            entity_id: d.id,
+            action_status: 'info',
           });
         }
       });
 
       const vehicles = await this.getVehicles();
-      vehicles.forEach(v => {
+      vehicles.forEach((v) => {
+        if (v.status === 'Pending' || v.approval_status === 'pending') {
+          if (!inbox.some((n) => n.entity_id === v.id && n.type === 'vehicle_approval' && n.action_status === 'open')) {
+            generated.push({
+              id: `gen_vehicle_${v.id}`,
+              type: 'vehicle_approval',
+              title: 'Vehicle registration approval',
+              text: `${v.registration_number} awaits registration approval.`,
+              time: 'Pending',
+              created_at: now,
+              entity_id: v.id,
+              entity_type: 'vehicle',
+              action_status: 'open',
+              meta: {
+                registration: v.registration_number,
+                registration_number: v.registration_number,
+                model: v.model,
+                type: v.type,
+                capacity: String(v.max_load_capacity),
+                odometer: String(v.odometer),
+                doc: v.registration_doc_url,
+                ...(v.ocr_snapshot || {}),
+              },
+            });
+          }
+        }
         if (v.status === 'In Shop') {
-          notificationsList.push({
+          generated.push({
             id: `notif_maint_${v.id}`,
             type: 'maintenance',
-            text: `Vehicle ${v.registration_number} is undergoing active workshop maintenance.`,
-            time: 'In shop'
-          });
-        } else if (v.odometer > 80000 && v.status === 'Available') {
-          notificationsList.push({
-            id: `notif_odo_${v.id}`,
-            type: 'maintenance',
-            text: `Vehicle ${v.registration_number} high mileage check (${v.odometer.toLocaleString()} km). Schedule service soon.`,
-            time: 'Overdue soon'
+            title: 'Workshop status',
+            text: `Vehicle ${v.registration_number} is in shop for maintenance.`,
+            time: 'In shop',
+            created_at: now,
+            entity_id: v.id,
+            entity_type: 'vehicle',
+            action_status: 'info',
           });
         }
       });
 
       const trips = await this.getTrips();
-      const activeTrips = trips.filter(t => t.status === 'Dispatched');
-      activeTrips.forEach(t => {
-        notificationsList.push({
-          id: `notif_trip_${t.id}`,
-          type: 'trip',
-          text: `Trip TRP-${t.id.substring(0, 4)} is actively in transit to ${t.destination}.`,
-          time: 'Active'
+      trips
+        .filter((t) => t.status === 'Dispatched')
+        .forEach((t) => {
+          generated.push({
+            id: `notif_dispatch_${t.id}`,
+            type: 'dispatch',
+            title: 'Dispatch live',
+            text: `Trip #${t.trip_number}: ${t.source} → ${t.destination} is in transit.`,
+            time: 'Active',
+            created_at: t.created_at || now,
+            entity_id: t.id,
+            entity_type: 'trip',
+            action_status: 'info',
+          });
         });
-      });
-
+      trips
+        .filter((t) => t.status === 'Draft')
+        .forEach((t) => {
+          generated.push({
+            id: `notif_draft_${t.id}`,
+            type: 'dispatch',
+            title: 'Dispatch ready',
+            text: `Trip #${t.trip_number} draft ready for dispatch assignment.`,
+            time: 'Draft',
+            created_at: t.created_at || now,
+            entity_id: t.id,
+            entity_type: 'trip',
+            action_status: 'info',
+          });
+        });
     } catch (err) {
-      console.error("Error generating dynamic notifications:", err);
+      console.error('Error generating dynamic notifications:', err);
     }
 
-    // Default notifications if none generated to keep UI populated
-    if (notificationsList.length === 0) {
-      notificationsList.push(
-        { id: 'default_1', type: 'expiry', text: 'All fleet drivers licenses are currently in compliance.', time: 'System Check' },
-        { id: 'default_2', type: 'maintenance', text: 'No vehicles require urgent workshop check-in today.', time: 'System Check' }
-      );
+    // Merge: open inbox items first, then generated (dedupe by id)
+    const byId = new Map<string, AppNotification>();
+    for (const n of [...inbox, ...generated]) {
+      if (!byId.has(n.id)) byId.set(n.id, n);
+    }
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  },
+
+  async markNotificationRead(id: string): Promise<void> {
+    const list = getSandboxState<AppNotification>(NOTIF_KEY, []);
+    const idx = list.findIndex((n) => n.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], read: true };
+      saveSandboxState(NOTIF_KEY, list);
+    }
+  },
+
+  async markAllNotificationsRead(): Promise<void> {
+    const list = getSandboxState<AppNotification>(NOTIF_KEY, []);
+    saveSandboxState(
+      NOTIF_KEY,
+      list.map((n) => ({ ...n, read: true }))
+    );
+  },
+
+  async resolveApproval(
+    notificationId: string,
+    decision: 'approved' | 'rejected'
+  ): Promise<void> {
+    const list = getSandboxState<AppNotification>(NOTIF_KEY, []);
+    const notif =
+      list.find((n) => n.id === notificationId) ||
+      (await this.getNotifications()).find((n) => n.id === notificationId);
+    if (!notif?.entity_id || !notif.entity_type) return;
+
+    if (notif.entity_type === 'driver') {
+      if (decision === 'approved') {
+        await this.updateDriver(notif.entity_id, {
+          status: 'Available',
+          approval_status: 'approved',
+        });
+      } else {
+        await this.updateDriver(notif.entity_id, {
+          status: 'Inactive',
+          approval_status: 'rejected',
+        });
+      }
     }
 
-    return notificationsList;
+    if (notif.entity_type === 'vehicle') {
+      if (decision === 'approved') {
+        await this.updateVehicle(notif.entity_id, {
+          status: 'Available',
+          approval_status: 'approved',
+        });
+      } else {
+        await this.updateVehicle(notif.entity_id, {
+          status: 'Pending',
+          approval_status: 'rejected',
+        });
+      }
+    }
+
+    const idx = list.findIndex((n) => n.id === notificationId || n.entity_id === notif.entity_id);
+    if (idx !== -1) {
+      list[idx] = {
+        ...list[idx],
+        action_status: decision,
+        read: true,
+        time: decision === 'approved' ? 'Approved' : 'Rejected',
+      };
+      saveSandboxState(NOTIF_KEY, list);
+    } else {
+      // generated-only id — persist resolution
+      pushInboxNotification({
+        id: notificationId,
+        type: notif.type,
+        title: notif.title,
+        text: notif.text,
+        entity_id: notif.entity_id,
+        entity_type: notif.entity_type,
+        action_status: decision,
+        time: decision === 'approved' ? 'Approved' : 'Rejected',
+      });
+      const again = getSandboxState<AppNotification>(NOTIF_KEY, []);
+      const i = again.findIndex((n) => n.id === notificationId);
+      if (i !== -1) {
+        again[i] = { ...again[i], read: true, action_status: decision };
+        saveSandboxState(NOTIF_KEY, again);
+      }
+    }
+  },
+
+  async submitDriverLicense(
+    driverId: string,
+    licenseDocUrl: string,
+    ocrSnapshot?: Record<string, string>
+  ): Promise<Driver> {
+    const current = (await this.getDrivers()).find((d) => d.id === driverId);
+    const ocr = ocrSnapshot ||
+      current?.ocr_snapshot || {
+        name: current?.name || '',
+        license_number: current?.license_number || '',
+        license_category: current?.license_category || '',
+        license_expiry_date: current?.license_expiry_date || '',
+        contact_number: current?.contact_number || '',
+      };
+    const updated = await this.updateDriver(driverId, {
+      license_doc_url: licenseDocUrl,
+      status: 'Pending',
+      approval_status: 'pending',
+      ocr_snapshot: ocr,
+    });
+    pushInboxNotification({
+      type: 'driver_approval',
+      title: 'Driver activation review',
+      text: `${updated.name} uploaded a license — review image & OCR to activate.`,
+      entity_id: updated.id,
+      entity_type: 'driver',
+      action_status: 'open',
+      meta: {
+        doc: licenseDocUrl,
+        name: updated.name,
+        license_number: updated.license_number,
+        license_category: updated.license_category,
+        license_expiry_date: updated.license_expiry_date,
+        contact_number: updated.contact_number,
+        ...ocr,
+      },
+    });
+    return updated;
+  },
+
+  async submitVehicleRegistration(
+    vehicleId: string,
+    registrationDocUrl: string,
+    ocrSnapshot?: Record<string, string>
+  ): Promise<Vehicle> {
+    const current = (await this.getVehicles()).find((v) => v.id === vehicleId);
+    const ocr = ocrSnapshot ||
+      current?.ocr_snapshot || {
+        registration_number: current?.registration_number || '',
+        model: current?.model || '',
+        type: current?.type || '',
+      };
+    const updated = await this.updateVehicle(vehicleId, {
+      registration_doc_url: registrationDocUrl,
+      status: 'Pending',
+      approval_status: 'pending',
+      ocr_snapshot: ocr,
+    });
+    pushInboxNotification({
+      type: 'vehicle_approval',
+      title: 'Vehicle registration review',
+      text: `${updated.registration_number} registration uploaded — review image & OCR.`,
+      entity_id: updated.id,
+      entity_type: 'vehicle',
+      action_status: 'open',
+      meta: {
+        doc: registrationDocUrl,
+        registration: updated.registration_number,
+        model: updated.model,
+        type: updated.type,
+        capacity: String(updated.max_load_capacity),
+        odometer: String(updated.odometer),
+        ...ocr,
+      },
+    });
+    return updated;
+  },
+
+  async getDriverById(id: string): Promise<Driver | null> {
+    const list = await this.getDrivers();
+    return list.find((d) => d.id === id) || null;
+  },
+
+  async getVehicleById(id: string): Promise<Vehicle | null> {
+    const list = await this.getVehicles();
+    return list.find((v) => v.id === id) || null;
   },
 
   // GPS POSITIONS — lat/lng snapshots persisted in sandbox DB

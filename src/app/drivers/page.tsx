@@ -39,10 +39,12 @@ export default function DriversPage() {
   const [licenseType, setLicenseType] = useState('');
   const [contact, setContact] = useState('');
   const [expiry, setExpiry] = useState('');
-  const [status, setStatus] = useState<Driver['status']>('Available');
+  const [status, setStatus] = useState<Driver['status']>('Inactive');
   const [safetyScore, setSafetyScore] = useState('100');
   const [errorMsg, setErrorMsg] = useState('');
   const [isOCRValidated, setIsOCRValidated] = useState(false);
+  const [licenseDocUrl, setLicenseDocUrl] = useState('');
+  const [licenseFileName, setLicenseFileName] = useState('');
 
   const fetchDrivers = async () => {
     setLoading(true);
@@ -66,11 +68,13 @@ export default function DriversPage() {
     setLicenseType('');
     setContact('');
     setExpiry('');
-    setStatus('Available');
+    setStatus('Inactive');
     setSafetyScore('100');
     setEditingId(null);
     setIsOCRValidated(false);
     setErrorMsg('');
+    setLicenseDocUrl('');
+    setLicenseFileName('');
   };
 
   const openCreate = () => {
@@ -87,9 +91,19 @@ export default function DriversPage() {
     setExpiry(d.license_expiry_date);
     setStatus(d.status);
     setSafetyScore(String(d.safety_score));
+    setLicenseDocUrl(d.license_doc_url || '');
+    setLicenseFileName(d.license_doc_url ? 'Uploaded document' : '');
     setIsOCRValidated(false);
     setErrorMsg('');
     setIsOpen(true);
+  };
+
+  const handleLicenseFile = async (file: File | null) => {
+    if (!file) return;
+    // Store as blob URL for sandbox preview / notification meta
+    const url = URL.createObjectURL(file);
+    setLicenseDocUrl(url);
+    setLicenseFileName(file.name);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +115,21 @@ export default function DriversPage() {
       return;
     }
 
+    if (!editingId && !licenseDocUrl) {
+      setErrorMsg('Upload a license image so the fleet manager can review and activate this driver.');
+      return;
+    }
+
     try {
+      const ocr_snapshot = {
+        name: name.trim(),
+        license_number: licenseNum.trim().toUpperCase(),
+        license_category: licenseType,
+        license_expiry_date: expiry,
+        contact_number: contact,
+        ocr_validated: isOCRValidated ? 'yes' : 'no',
+      };
+
       const payload = {
         name: name.trim(),
         license_number: licenseNum.trim().toUpperCase(),
@@ -110,12 +138,24 @@ export default function DriversPage() {
         license_expiry_date: expiry,
         status,
         safety_score: Number(safetyScore) || 100,
+        license_doc_url: licenseDocUrl || undefined,
+        ocr_snapshot,
       };
 
       if (editingId) {
         await db.updateDriver(editingId, payload);
+        // Re-submit for approval if still inactive and has doc
+        if ((status === 'Inactive' || status === 'Pending') && licenseDocUrl) {
+          await db.submitDriverLicense(editingId, licenseDocUrl, ocr_snapshot);
+        }
       } else {
-        await db.createDriver({ ...payload, status: 'Available', safety_score: 100 });
+        // New drivers: not active until fleet manager accepts (Pending with doc)
+        await db.createDriver({
+          ...payload,
+          status: 'Pending',
+          safety_score: 100,
+          approval_status: 'pending',
+        });
       }
 
       resetForm();
@@ -147,9 +187,13 @@ export default function DriversPage() {
 
   const getStatusBadge = (status: Driver['status']) => {
     switch (status) {
-      case 'Available': return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20">Available</Badge>;
-      case 'On Trip': return <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">On Trip</Badge>;
-      case 'Off Duty': return <Badge variant="secondary" className="bg-slate-500/10 text-slate-500 hover:bg-slate-500/20">Off Duty</Badge>;
+      case 'Available': return <Badge variant="secondary" className="font-normal">Available</Badge>;
+      case 'On Trip': return <Badge variant="outline" className="font-normal">On Trip</Badge>;
+      case 'Off Duty': return <Badge variant="outline" className="font-normal">Off Duty</Badge>;
+      case 'Inactive': return <Badge variant="outline" className="font-normal text-muted-foreground">Inactive</Badge>;
+      case 'Pending': return <Badge variant="secondary" className="font-normal">Pending approval</Badge>;
+      case 'Suspended': return <Badge variant="destructive" className="font-normal">Suspended</Badge>;
+      default: return <Badge variant="outline" className="font-normal">{status}</Badge>;
     }
   };
 
@@ -163,8 +207,10 @@ export default function DriversPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Driver Personnel</h2>
-          <p className="text-sm text-muted-foreground">Manage drivers, licenses, and safety scores</p>
+          <h2 className="text-xl tracking-tight font-medium">Driver personnel</h2>
+          <p className="text-sm text-muted-foreground">
+            New drivers stay inactive until license upload is accepted by fleet manager
+          </p>
         </div>
         
         {canAccess('drivers', 'create') && (
@@ -252,11 +298,11 @@ export default function DriversPage() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Driver' : 'Register New Driver'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-medium">{editingId ? 'Edit driver' : 'Register new driver'}</DialogTitle>
+            <DialogDescription className="font-normal">
               {editingId
                 ? 'Update license, contact, safety score, and duty status.'
-                : "Scan a driver's license to auto-fill, or enter manually."}
+                : 'Upload license image and submit — status stays pending until fleet manager accepts.'}
             </DialogDescription>
           </DialogHeader>
           {!editingId && (
@@ -270,6 +316,25 @@ export default function DriversPage() {
                 <AlertCircle className="h-4 w-4" /> {errorMsg}
               </div>
             )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">License document image</label>
+              <Input
+                type="file"
+                accept="image/*,.pdf"
+                className="font-normal cursor-pointer"
+                onChange={(e) => handleLicenseFile(e.target.files?.[0] || null)}
+              />
+              {licenseFileName && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> {licenseFileName}
+                </p>
+              )}
+              {!editingId && (
+                <p className="text-[11px] text-muted-foreground">
+                  Required for activation. Fleet manager reviews this in Notifications.
+                </p>
+              )}
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Full Name</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Aman Mahadik" />
@@ -319,6 +384,8 @@ export default function DriversPage() {
                       <SelectItem value="Available">Available</SelectItem>
                       <SelectItem value="On Trip">On Trip</SelectItem>
                       <SelectItem value="Off Duty">Off Duty</SelectItem>
+                      <SelectItem value="Inactive">Inactive</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
                       <SelectItem value="Suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
@@ -339,7 +406,9 @@ export default function DriversPage() {
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{editingId ? 'Save changes' : 'Save Driver'}</Button>
+              <Button type="submit" className="font-normal">
+                {editingId ? 'Save changes' : 'Submit for approval'}
+              </Button>
             </div>
           </form>
         </DialogContent>

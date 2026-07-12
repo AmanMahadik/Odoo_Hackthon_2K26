@@ -45,9 +45,11 @@ function VehiclesContent() {
   const [capacity, setCapacity] = useState('');
   const [odometer, setOdometer] = useState('');
   const [cost, setCost] = useState('');
-  const [status, setStatus] = useState<Vehicle['status']>('Available');
+  const [status, setStatus] = useState<Vehicle['status']>('Pending');
   const [errorMsg, setErrorMsg] = useState('');
   const [isOCRValidated, setIsOCRValidated] = useState(false);
+  const [regDocUrl, setRegDocUrl] = useState('');
+  const [regFileName, setRegFileName] = useState('');
 
   const fetchVehicles = async () => {
     setLoading(true);
@@ -75,10 +77,12 @@ function VehiclesContent() {
     setOdometer('');
     setCost('');
     setType('Van');
-    setStatus('Available');
+    setStatus('Pending');
     setEditingId(null);
     setIsOCRValidated(false);
     setErrorMsg('');
+    setRegDocUrl('');
+    setRegFileName('');
   };
 
   const openCreate = () => {
@@ -95,9 +99,17 @@ function VehiclesContent() {
     setOdometer(String(v.odometer));
     setCost(String(v.acquisition_cost));
     setStatus(v.status);
+    setRegDocUrl(v.registration_doc_url || '');
+    setRegFileName(v.registration_doc_url ? 'Uploaded registration' : '');
     setIsOCRValidated(false);
     setErrorMsg('');
     setIsOpen(true);
+  };
+
+  const handleRegFile = (file: File | null) => {
+    if (!file) return;
+    setRegDocUrl(URL.createObjectURL(file));
+    setRegFileName(file.name);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +118,11 @@ function VehiclesContent() {
 
     if (!regNum || !model || !capacity || !odometer || !cost) {
       setErrorMsg('Please fill in all required fields.');
+      return;
+    }
+
+    if (!editingId && !regDocUrl) {
+      setErrorMsg('Upload a registration document so the fleet manager can approve this vehicle.');
       return;
     }
 
@@ -120,6 +137,16 @@ function VehiclesContent() {
     }
 
     try {
+      const ocr_snapshot = {
+        registration_number: regNum.trim().toUpperCase(),
+        model: model.trim(),
+        type,
+        max_load_capacity: String(capacity),
+        odometer: String(odometer),
+        acquisition_cost: String(cost),
+        ocr_validated: isOCRValidated ? 'yes' : 'no',
+      };
+
       const payload = {
         registration_number: regNum.trim().toUpperCase(),
         model: model.trim(),
@@ -128,12 +155,22 @@ function VehiclesContent() {
         odometer: Number(odometer),
         acquisition_cost: Number(cost),
         status,
+        registration_doc_url: regDocUrl || undefined,
+        ocr_snapshot,
       };
 
       if (editingId) {
         await db.updateVehicle(editingId, payload);
+        if (status === 'Pending' && regDocUrl) {
+          await db.submitVehicleRegistration(editingId, regDocUrl, ocr_snapshot);
+        }
       } else {
-        await db.createVehicle({ ...payload, status: 'Available' });
+        // New vehicles stay pending/not active until fleet manager accepts
+        await db.createVehicle({
+          ...payload,
+          status: 'Pending',
+          approval_status: 'pending',
+        });
       }
 
       resetForm();
@@ -188,10 +225,12 @@ function VehiclesContent() {
 
   const getStatusBadge = (status: Vehicle['status']) => {
     switch (status) {
-      case 'Available': return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20">Available</Badge>;
-      case 'On Trip': return <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">On Trip</Badge>;
-      case 'In Shop': return <Badge variant="secondary" className="bg-destructive/10 text-destructive hover:bg-destructive/20">In Shop</Badge>;
-      case 'Retired': return <Badge variant="secondary">Retired</Badge>;
+      case 'Available': return <Badge variant="secondary" className="font-normal">Available</Badge>;
+      case 'On Trip': return <Badge variant="outline" className="font-normal">On Trip</Badge>;
+      case 'In Shop': return <Badge variant="outline" className="font-normal">In Shop</Badge>;
+      case 'Retired': return <Badge variant="secondary" className="font-normal">Retired</Badge>;
+      case 'Pending': return <Badge variant="secondary" className="font-normal">Pending approval</Badge>;
+      default: return <Badge variant="outline" className="font-normal">{status}</Badge>;
     }
   };
 
@@ -199,8 +238,10 @@ function VehiclesContent() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Vehicle Registry</h2>
-          <p className="text-sm text-muted-foreground">Master database of all logistics transport units</p>
+          <h2 className="text-xl tracking-tight font-medium">Vehicle registry</h2>
+          <p className="text-sm text-muted-foreground">
+            New units stay pending until registration documents are accepted
+          </p>
         </div>
         
         {canAccess('vehicles', 'create') && (
@@ -233,6 +274,7 @@ function VehiclesContent() {
                 <SelectItem value="Available">Available</SelectItem>
                 <SelectItem value="On Trip">On Trip</SelectItem>
                 <SelectItem value="In Shop">In Shop</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Retired">Retired</SelectItem>
               </SelectContent>
             </Select>
@@ -340,11 +382,11 @@ function VehiclesContent() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Vehicle' : 'Register New Vehicle'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="font-medium">{editingId ? 'Edit vehicle' : 'Register new vehicle'}</DialogTitle>
+            <DialogDescription className="font-normal">
               {editingId
                 ? 'Update registry fields and operational status.'
-                : 'Use the AI scanner to auto-fill plate details, or enter manually.'}
+                : 'Upload registration document — fleet manager must accept before the unit is available.'}
             </DialogDescription>
           </DialogHeader>
           {!editingId && (
@@ -358,6 +400,20 @@ function VehiclesContent() {
                 <AlertCircle className="h-4 w-4" /> {errorMsg}
               </div>
             )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Registration document</label>
+              <Input
+                type="file"
+                accept="image/*,.pdf"
+                className="font-normal cursor-pointer"
+                onChange={(e) => handleRegFile(e.target.files?.[0] || null)}
+              />
+              {regFileName && (
+                <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> {regFileName}
+                </p>
+              )}
+            </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Registration Number</label>
               <div className="flex gap-2 items-center">
@@ -420,6 +476,7 @@ function VehiclesContent() {
                       <SelectItem value="Available">Available</SelectItem>
                       <SelectItem value="On Trip">On Trip</SelectItem>
                       <SelectItem value="In Shop">In Shop</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
                       <SelectItem value="Retired">Retired</SelectItem>
                     </SelectContent>
                   </Select>
@@ -430,7 +487,9 @@ function VehiclesContent() {
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{editingId ? 'Save changes' : 'Save Vehicle'}</Button>
+              <Button type="submit" className="font-normal">
+                {editingId ? 'Save changes' : 'Submit for approval'}
+              </Button>
             </div>
           </form>
         </DialogContent>

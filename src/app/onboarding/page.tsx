@@ -4,49 +4,75 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRole, Role } from '@/lib/roleContext';
 import { useUser } from '@clerk/nextjs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, User as UserIcon, Briefcase, TrendingUp, Truck, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  ShieldCheck,
+  TrendingUp,
+  Truck,
+  AlertTriangle,
+  Navigation,
+  Wrench,
+  Check,
+} from 'lucide-react';
 
-const roles: { id: Role; title: string; description: string; icon: React.ElementType }[] = [
+/** Self-serve roles only — Fleet Manager is assigned by admin, not selectable here */
+const roles: {
+  id: Role;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
   {
     id: 'Driver',
     title: 'Driver',
-    description: 'View your dispatched trips, log fuel expenses, and report vehicle issues.',
-    icon: Truck
+    description: 'View trips, log fuel, and report vehicle issues from the road.',
+    icon: Truck,
   },
   {
-    id: 'Fleet Manager',
-    title: 'Fleet Manager',
-    description: 'Full access to operations, fleet assets, dispatching, and analytics.',
-    icon: Briefcase
+    id: 'Dispatcher',
+    title: 'Dispatcher',
+    description: 'Assign trips, check driver and vehicle availability.',
+    icon: Navigation,
   },
   {
     id: 'Safety Officer',
     title: 'Safety Officer',
-    description: 'Monitor compliance, track driver licenses, and oversee safety scores.',
-    icon: ShieldCheck
+    description: 'Compliance, licenses, safety scores, and workshop visibility.',
+    icon: ShieldCheck,
   },
   {
     id: 'Financial Analyst',
     title: 'Financial Analyst',
-    description: 'Review expenses, fuel consumption, and overall fleet profitability.',
-    icon: TrendingUp
-  }
+    description: 'Expenses, fuel, ROI reports, and cost scenarios.',
+    icon: TrendingUp,
+  },
+  {
+    id: 'Maintenance Technician',
+    title: 'Maintenance Technician',
+    description: 'Work orders, fleet units, and predictive service alerts.',
+    icon: Wrench,
+  },
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
   const { updateProfile, profile, loading: roleLoading } = useRole();
-  
+
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [contactNumber, setContactNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Redirect if they already have a profile
   useEffect(() => {
     if (!roleLoading && profile) {
       router.push('/');
@@ -59,15 +85,19 @@ export default function OnboardingPage() {
       setError('Please select a role to continue.');
       return;
     }
+    if (selectedRole === 'Fleet Manager') {
+      setError('Fleet Manager access is assigned by your organization admin.');
+      return;
+    }
 
     setIsSubmitting(true);
     setError('');
 
     try {
       await updateProfile({
-        full_name: user?.fullName || 'System User',
+        full_name: user?.fullName || user?.firstName || 'System User',
         role: selectedRole,
-        contact_number: contactNumber
+        contact_number: contactNumber,
       });
       router.push('/');
     } catch (err: any) {
@@ -78,97 +108,135 @@ export default function OnboardingPage() {
 
   if (roleLoading || profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-9 w-9 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-xs text-muted-foreground font-normal">Loading profile…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
-      {/* Decorative background gradients */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/5 blur-[120px] pointer-events-none" />
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-background px-4 py-10 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-muted/40 via-background to-background" />
+      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[32rem] rounded-full bg-foreground/[0.03] blur-3xl" />
 
-      <Card className="w-full max-w-2xl border-border shadow-xl z-10 animate-in fade-in zoom-in-95 duration-500">
-        <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto bg-primary/10 w-12 h-12 flex items-center justify-center rounded-xl mb-2">
-            <UserIcon className="h-6 w-6 text-primary" />
+      <div className="relative z-10 w-full max-w-2xl space-y-6">
+        {/* Brand */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon/light.png" alt="TransitOps" className="h-9 w-auto dark:hidden" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icon/dark.png"
+              alt="TransitOps"
+              className="h-9 w-auto hidden dark:block"
+            />
+            <span className="text-lg font-medium tracking-tight">TransitOps</span>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Complete your profile</CardTitle>
-          <CardDescription className="text-sm">
-            Select your primary role in TransitOps to customize your dashboard experience.
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            {error && (
-              <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-xs flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+        </div>
 
-            <div className="space-y-3">
-              <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Select Your Role</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {roles.map((r) => {
-                  const Icon = r.icon;
-                  const isSelected = selectedRole === r.id;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => setSelectedRole(r.id)}
-                      className={`text-left p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
-                        isSelected 
-                          ? 'border-primary bg-primary/5 shadow-sm' 
-                          : 'border-border bg-card hover:border-primary/50 hover:bg-muted/50'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg mt-0.5 ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className={`font-bold text-sm ${isSelected ? 'text-foreground' : 'text-foreground'}`}>
-                            {r.title}
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-4 space-y-1.5 text-center sm:text-left">
+            <CardTitle className="text-xl font-medium tracking-tight">
+              Complete your profile
+            </CardTitle>
+            <CardDescription className="font-normal">
+              Choose your workspace role. Fleet Manager access is provisioned by an admin — it
+              cannot be self-selected.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-xl text-xs flex items-center gap-2 font-normal">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <Label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Select your role
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {roles.map((r) => {
+                    const Icon = r.icon;
+                    const isSelected = selectedRole === r.id;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setSelectedRole(r.id)}
+                        className={`relative text-left p-3.5 rounded-xl border transition-all duration-150 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          isSelected
+                            ? 'border-foreground/30 bg-muted/60 shadow-sm'
+                            : 'border-border bg-card hover:bg-muted/40 hover:border-border'
+                        }`}
+                      >
+                        {isSelected && (
+                          <span className="absolute top-2.5 right-2.5 h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                            <Check className="h-3 w-3" />
+                          </span>
+                        )}
+                        <div className="flex items-start gap-3 pr-6">
+                          <div
+                            className={`p-2 rounded-lg shrink-0 border ${
+                              isSelected
+                                ? 'bg-background border-border text-foreground'
+                                : 'bg-muted/50 border-transparent text-muted-foreground'
+                            }`}
+                          >
+                            <Icon className="h-4 w-4" />
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1 leading-snug">
-                            {r.description}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-foreground">{r.title}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5 leading-snug font-normal">
+                              {r.description}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2 pt-2">
-              <Label htmlFor="contact" className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Contact Number (Optional)</Label>
-              <input
-                id="contact"
-                type="tel"
-                placeholder="+1 (555) 000-0000"
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                className="w-full bg-background border border-input focus:border-ring rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none transition-all"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label
+                  htmlFor="contact"
+                  className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                >
+                  Contact number (optional)
+                </Label>
+                <Input
+                  id="contact"
+                  type="tel"
+                  placeholder="+1 (555) 000-0000"
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
+                  className="font-normal h-10"
+                />
+              </div>
 
-            <Button 
-              type="submit" 
-              className="w-full py-6 text-sm font-bold shadow-sm"
-              disabled={!selectedRole || isSubmitting}
-            >
-              {isSubmitting ? 'Setting up workspace...' : 'Complete Setup & Enter App'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              <Button
+                type="submit"
+                className="w-full h-10 font-normal"
+                disabled={!selectedRole || isSubmitting}
+              >
+                {isSubmitting ? 'Setting up workspace…' : 'Continue to dashboard'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-[10px] text-muted-foreground/70 tracking-wide uppercase">
+          Smart transport operations
+        </p>
+      </div>
     </div>
   );
 }
