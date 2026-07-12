@@ -127,7 +127,7 @@ export default function FuelExpensesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-extrabold tracking-tight text-foreground">Fuel & Expenses Ledger</h2>
+          <h2 className="text-xl tracking-tight text-foreground font-normal">Fuel &amp; Expenses</h2>
           <p className="text-xs text-muted-foreground">Track fuel consumption, toll fees, and maintenance costs per vehicle</p>
         </div>
 
@@ -135,14 +135,16 @@ export default function FuelExpensesPage() {
           {canAccess('expenses', 'create') && (
             <>
               <button
+                type="button"
                 onClick={() => setFuelOpen(true)}
-                className="px-3 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border hover:bg-secondary text-foreground rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-border bg-background text-foreground text-sm font-normal hover:bg-muted cursor-pointer"
               >
-                <Fuel className="h-4 w-4 text-primary" /> Log Fuel
+                <Fuel className="h-4 w-4" /> Log Fuel
               </button>
               <button
+                type="button"
                 onClick={() => setExpenseOpen(true)}
-                className="px-3 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm text-foreground rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-blue-500/10 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-normal hover:bg-primary/90 cursor-pointer"
               >
                 <Plus className="h-4 w-4" /> Log Expense
               </button>
@@ -155,8 +157,8 @@ export default function FuelExpensesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider block">Cumulative Fuel Expenses</span>
-            <span className="text-2xl font-black text-foreground">${totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-xs text-muted-foreground font-normal uppercase tracking-wider block">Cumulative Fuel Expenses</span>
+            <span className="text-2xl font-normal text-foreground">${totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             <p className="text-[10px] text-muted-foreground">From {fuelLogs.length} logs recorded</p>
           </div>
           <div className="p-3 bg-blue-500/10 rounded-xl text-primary">
@@ -166,8 +168,8 @@ export default function FuelExpensesPage() {
 
         <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider block">Cumulative General Expenses</span>
-            <span className="text-2xl font-black text-foreground">${totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-xs text-muted-foreground font-normal uppercase tracking-wider block">Cumulative General Expenses</span>
+            <span className="text-2xl font-normal text-foreground">${totalExpenseCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             <p className="text-[10px] text-muted-foreground">Tolls, service charges, repairs</p>
           </div>
           <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
@@ -177,7 +179,7 @@ export default function FuelExpensesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-border flex gap-4 text-xs font-bold">
+      <div className="border-b border-border flex gap-4 text-xs font-normal">
         <button
           onClick={() => setActiveTab('fuel')}
           className={`pb-3 transition-colors ${activeTab === 'fuel' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
@@ -201,13 +203,13 @@ export default function FuelExpensesPage() {
         fuelLogs.length === 0 ? (
           <div className="bg-muted/30 border border-border p-12 text-center rounded-2xl">
             <Fuel className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground font-semibold">No fuel logs found.</p>
+            <p className="text-xs text-muted-foreground font-normal">No fuel logs found.</p>
           </div>
         ) : (
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-200">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-muted/50 border-b border-border text-muted-foreground font-bold uppercase tracking-wider">
+                <tr className="bg-muted/50 border-b border-border text-muted-foreground font-normal uppercase tracking-wider">
                   <th className="p-4">Vehicle</th>
                   <th className="p-4">Log Date</th>
                   <th className="p-4">Liters Consumed</th>
@@ -216,19 +218,19 @@ export default function FuelExpensesPage() {
                   <th className="p-4">Source Link</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850">
+              <tbody className="divide-y divide-border">
                 {fuelLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-muted/50 transition-colors">
-                    <td className="p-4 font-bold text-foreground">
+                    <td className="p-4 font-normal text-foreground">
                       {log.vehicle ? log.vehicle.registration_number : 'Unknown'}
                     </td>
                     <td className="p-4 text-muted-foreground">{log.log_date}</td>
-                    <td className="p-4 text-foreground font-semibold font-mono">{log.liters} L</td>
-                    <td className="p-4 text-foreground font-bold font-mono">${log.cost}</td>
-                    <td className="p-4 text-muted-foreground font-mono">${(log.cost / log.liters).toFixed(2)}/L</td>
+                    <td className="p-4 text-foreground font-normal">{log.liters} L</td>
+                    <td className="p-4 text-foreground font-normal">${log.cost}</td>
+                    <td className="p-4 text-muted-foreground">${(log.cost / log.liters).toFixed(2)}/L</td>
                     <td className="p-4">
                       {log.trip_id ? (
-                        <span className="text-[10px] text-primary font-bold bg-blue-500/10 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] text-primary font-normal bg-blue-500/10 px-2 py-0.5 rounded-full">
                           Trip Link
                         </span>
                       ) : (
@@ -245,13 +247,13 @@ export default function FuelExpensesPage() {
         expenses.length === 0 ? (
           <div className="bg-muted/30 border border-border p-12 text-center rounded-2xl">
             <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground font-semibold">No expenses recorded.</p>
+            <p className="text-xs text-muted-foreground font-normal">No expenses recorded.</p>
           </div>
         ) : (
           <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-200">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-muted/50 border-b border-border text-muted-foreground font-bold uppercase tracking-wider">
+                <tr className="bg-muted/50 border-b border-border text-muted-foreground font-normal uppercase tracking-wider">
                   <th className="p-4">Vehicle</th>
                   <th className="p-4">Expense Date</th>
                   <th className="p-4">Type</th>
@@ -259,15 +261,15 @@ export default function FuelExpensesPage() {
                   <th className="p-4">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-850">
+              <tbody className="divide-y divide-border">
                 {expenses.map((exp) => (
                   <tr key={exp.id} className="hover:bg-muted/50 transition-colors">
-                    <td className="p-4 font-bold text-foreground">
+                    <td className="p-4 font-normal text-foreground">
                       {exp.vehicle ? exp.vehicle.registration_number : 'Unknown'}
                     </td>
                     <td className="p-4 text-muted-foreground">{exp.expense_date}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] uppercase font-bold ${
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] uppercase font-normal ${
                         exp.type === 'toll' ? 'bg-blue-500/10 text-primary' :
                         exp.type === 'repair' ? 'bg-destructive/10 text-destructive' :
                         'bg-secondary text-muted-foreground'
@@ -276,7 +278,7 @@ export default function FuelExpensesPage() {
                       </span>
                     </td>
                     <td className="p-4 text-foreground">{exp.description || 'General fee charge'}</td>
-                    <td className="p-4 text-foreground font-bold font-mono">${exp.amount}</td>
+                    <td className="p-4 text-foreground font-normal">${exp.amount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -290,7 +292,7 @@ export default function FuelExpensesPage() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-sm overflow-hidden shadow-xl animate-in zoom-in duration-200">
             <div className="p-6 border-b border-border flex justify-between items-center">
-              <h3 className="font-extrabold text-foreground text-sm">Log Fuel Entry</h3>
+              <h3 className="text-foreground text-sm font-normal">Log Fuel Entry</h3>
               <button onClick={() => setFuelOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
@@ -305,7 +307,7 @@ export default function FuelExpensesPage() {
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Vehicle</label>
+                <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Vehicle</label>
                 <select
                   required
                   value={fuelVehicleId}
@@ -321,7 +323,7 @@ export default function FuelExpensesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Liters</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Liters</label>
                   <input
                     type="number"
                     required
@@ -333,7 +335,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Total Cost ($)</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Total Cost ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -347,7 +349,7 @@ export default function FuelExpensesPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Purchase Date</label>
+                <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Purchase Date</label>
                 <input
                   type="date"
                   required
@@ -361,13 +363,13 @@ export default function FuelExpensesPage() {
                 <button
                   type="button"
                   onClick={() => setFuelOpen(false)}
-                  className="flex-1 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-foreground rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-foreground rounded-xl text-xs font-normal transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm text-foreground rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
+                  className="flex-1 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm text-foreground rounded-xl text-xs font-normal transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
                 >
                   Save Entry
                 </button>
@@ -382,7 +384,7 @@ export default function FuelExpensesPage() {
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-2xl w-full max-w-sm overflow-hidden shadow-xl animate-in zoom-in duration-200">
             <div className="p-6 border-b border-border flex justify-between items-center">
-              <h3 className="font-extrabold text-foreground text-sm">Log Fleet Expense</h3>
+              <h3 className="text-foreground text-sm font-normal">Log Fleet Expense</h3>
               <button onClick={() => setExpenseOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
@@ -397,7 +399,7 @@ export default function FuelExpensesPage() {
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Vehicle</label>
+                <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Vehicle</label>
                 <select
                   required
                   value={expenseVehicleId}
@@ -413,7 +415,7 @@ export default function FuelExpensesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Expense Type</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Expense Type</label>
                   <select
                     value={expenseType}
                     onChange={(e) => setExpenseType(e.target.value as any)}
@@ -426,7 +428,7 @@ export default function FuelExpensesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Amount ($)</label>
+                  <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Amount ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -440,7 +442,7 @@ export default function FuelExpensesPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Description</label>
+                <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Description</label>
                 <input
                   type="text"
                   required
@@ -452,7 +454,7 @@ export default function FuelExpensesPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-muted-foreground uppercase mb-1">Charge Date</label>
+                <label className="block text-[10px] font-normal text-muted-foreground uppercase mb-1">Charge Date</label>
                 <input
                   type="date"
                   required
@@ -466,13 +468,13 @@ export default function FuelExpensesPage() {
                 <button
                   type="button"
                   onClick={() => setExpenseOpen(false)}
-                  className="flex-1 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-foreground rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-foreground rounded-xl text-xs font-normal transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm text-foreground rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
+                  className="flex-1 py-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm text-foreground rounded-xl text-xs font-normal transition-all shadow-lg shadow-blue-500/10 cursor-pointer"
                 >
                   Save Expense
                 </button>
