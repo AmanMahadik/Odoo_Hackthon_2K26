@@ -196,44 +196,78 @@
   border: none !important;
 }
 
-/* Hide Clerk branding / development badges outside the auth card */
+/* ── Clerk: hide branding / development chrome ── */
 .cl-footer,
-.cl-internal-b3fm6y,
 .cl-logoBox,
 .cl-logoImage,
 .cl-developmentModeNotice,
 .cl-userButtonPopoverFooter,
-[data-localization-key="developmentMode"],
-a[href*="clerk.com"],
-.cl-footerPages {
+.cl-footerPages,
+.cl-badge,
+[data-localization-key='developmentMode'],
+[data-localization-key='formButtonPrimary__signIn'],
+a[href*='clerk.com'],
+a[href*='clerk.dev'] {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-/* Clerk card follows app surface tokens as fallback */
+/* Keep our shell card; strip Clerk’s nested chrome */
 .cl-cardBox,
 .cl-card {
   background: transparent !important;
   color: var(--card-foreground) !important;
   border: none !important;
   box-shadow: none !important;
+  width: 100% !important;
 }
 .cl-rootBox {
   width: 100% !important;
+  max-width: 100% !important;
 }
-.cl-formFieldInput {
+
+/* Inputs */
+.cl-formFieldInput,
+.cl-input {
   background: var(--background) !important;
   color: var(--foreground) !important;
-  border-color: var(--border) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: none !important;
 }
-.cl-formButtonPrimary {
+
+/* Primary CTA — pin to theme primary (no purple) */
+.cl-formButtonPrimary,
+.cl-button[data-variant='solid'],
+button.cl-formButtonPrimary {
   background: var(--primary) !important;
+  background-color: var(--primary) !important;
   color: var(--primary-foreground) !important;
+  border: none !important;
+  border-radius: 0.75rem !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
 }
+.cl-formButtonPrimary:hover,
+button.cl-formButtonPrimary:hover {
+  background: var(--primary) !important;
+  filter: brightness(0.92);
+  opacity: 0.95;
+}
+
+/* Google / social */
 .cl-socialButtonsBlockButton {
   background: var(--background) !important;
   color: var(--foreground) !important;
-  border-color: var(--border) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: none !important;
 }
+
 .cl-dividerLine {
   background: var(--border) !important;
 }
@@ -246,4 +280,14 @@ a[href*="clerk.com"],
 .cl-headerTitle {
   color: var(--foreground) !important;
   font-weight: 500 !important;
+}
+
+/* Explicit light/dark CTA fallback if CSS vars fail on CDN */
+:root .cl-formButtonPrimary {
+  background: #171717 !important;
+  color: #fafafa !important;
+}
+.dark .cl-formButtonPrimary {
+  background: #f5f5f5 !important;
+  color: #0a0a0a !important;
 }

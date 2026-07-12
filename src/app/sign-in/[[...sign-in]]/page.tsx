@@ -39,6 +39,7 @@ export default function SignInPage() {
         path="/sign-in"
         signUpUrl="/sign-up"
         forceRedirectUrl="/"
+        fallbackRedirectUrl="/"
         appearance={appearance}
       />
     </AuthShell>

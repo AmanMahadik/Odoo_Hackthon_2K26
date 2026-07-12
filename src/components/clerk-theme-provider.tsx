@@ -7,8 +7,8 @@ import { useTheme } from 'next-themes';
 import { buildClerkAppearance } from '@/lib/clerkAppearance';
 
 /**
- * ClerkProvider that follows next-themes light/dark (including system).
- * Must render under ThemeProvider.
+ * ClerkProvider under ThemeProvider so appearance follows light/dark.
+ * Hardcodes sign-in/up paths so production never falls back to Clerk hosted UI.
  */
 export function ClerkThemeProvider({ children }: { children: React.ReactNode }) {
   const { resolvedTheme } = useTheme();
@@ -18,17 +18,26 @@ export function ClerkThemeProvider({ children }: { children: React.ReactNode }) 
     setMounted(true);
   }, []);
 
-  // Avoid wrong flash: prefer system until mounted, then follow resolved theme
-  const isDark =
-    mounted
-      ? resolvedTheme === 'dark'
-      : typeof window !== 'undefined' &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = mounted
+    ? resolvedTheme === 'dark'
+    : typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   const appearance = React.useMemo(
     () => buildClerkAppearance(isDark, dark),
     [isDark]
   );
 
-  return <ClerkProvider appearance={appearance}>{children}</ClerkProvider>;
+  return (
+    <ClerkProvider
+      appearance={appearance}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/onboarding"
+      afterSignOutUrl="/sign-in"
+    >
+      {children}
+    </ClerkProvider>
+  );
 }
