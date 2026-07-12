@@ -760,5 +760,60 @@ export const db = {
     }
 
     return notificationsList;
-  }
+  },
+
+  // GPS POSITIONS — lat/lng snapshots persisted in sandbox DB
+  async getGpsPositions(): Promise<
+    Record<
+      string,
+      {
+        lat: number;
+        lng: number;
+        heading?: number;
+        speed?: number;
+        fuel_percent?: number;
+        cargo_kg?: number;
+        cargo_max?: number;
+        destination?: string;
+        eta_minutes?: number;
+        at?: string;
+      }
+    >
+  > {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem('transitops_sandbox_gps_positions');
+      if (!raw) return {};
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  },
+
+  async saveGpsPositions(
+    positions: Record<
+      string,
+      {
+        lat: number;
+        lng: number;
+        heading?: number;
+        speed?: number;
+        fuel_percent?: number;
+        cargo_kg?: number;
+        cargo_max?: number;
+        destination?: string;
+        eta_minutes?: number;
+        at?: string;
+      }
+    >
+  ): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('transitops_sandbox_gps_positions', JSON.stringify(positions));
+      // Also keep legacy key in sync for any older readers
+      localStorage.setItem('transitops_gps_positions', JSON.stringify(positions));
+    } catch {
+      /* quota */
+    }
+  },
 };
