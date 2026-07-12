@@ -600,7 +600,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         <Card className="lg:col-span-8 overflow-hidden flex flex-col gap-0 py-0">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border shrink-0">
-            <span className="text-sm font-normal flex items-center gap-2">
+            <span className="text-sm font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4" /> Live fleet map
             </span>
             <div className="flex items-center gap-1.5">
@@ -635,7 +635,7 @@ export default function Dashboard() {
           {/* Global fuel index */}
           <Card className="border-border/50 shrink-0 gap-0 py-0">
             <div className="px-3 py-1.5 border-b border-border">
-              <span className="text-xs text-muted-foreground uppercase tracking-widest font-normal">
+              <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">
                 Global fuel index
               </span>
             </div>
@@ -644,7 +644,7 @@ export default function Dashboard() {
                 <>
                   <div className="flex justify-between items-end mb-2">
                     <div>
-                      <span className="text-2xl tracking-tight font-normal">
+                      <span className="text-2xl tracking-tight font-medium">
                         ${fuelIndex.price.toFixed(2)}
                       </span>
                       <span className="text-sm text-muted-foreground ml-1">/ L</span>
@@ -723,7 +723,7 @@ export default function Dashboard() {
           {/* Live units below fuel */}
           <Card className="flex flex-col min-h-0 flex-1 gap-0 py-0 overflow-hidden">
             <div className="px-3 py-1.5 border-b border-border shrink-0">
-              <span className="text-sm font-normal flex items-center gap-2">
+              <span className="text-sm font-medium flex items-center gap-2">
                 <Radio className="h-4 w-4 text-emerald-500" /> Live units
               </span>
             </div>
@@ -797,7 +797,7 @@ export default function Dashboard() {
       <Dialog open={mapFullscreen} onOpenChange={setMapFullscreen}>
         <DialogContent className="sm:max-w-[min(96vw,1200px)] w-[96vw] h-[90vh] max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-4 py-2.5 border-b border-border shrink-0 space-y-0">
-            <DialogTitle className="text-base font-normal flex items-center gap-2">
+            <DialogTitle className="text-base font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4" /> Detailed live fleet map
             </DialogTitle>
             <DialogDescription className="text-xs font-normal">
@@ -821,7 +821,7 @@ export default function Dashboard() {
         {canAccess('trips', 'read') && (
           <Card className="flex flex-col">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-normal flex items-center gap-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Navigation className="h-4 w-4 text-blue-500" /> Live & new trips
               </CardTitle>
               <CardDescription className="text-[11px]">Click any card → Trips</CardDescription>
@@ -874,7 +874,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Activity className="h-4 w-4" /> Live activity
             </CardTitle>
             <CardDescription className="text-[11px]">Updates slide to the top</CardDescription>
@@ -900,7 +900,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Wrench className="h-4 w-4 text-orange-500" /> Maint · Fuel
             </CardTitle>
             <CardDescription className="text-[11px]">Service queue & cost desk</CardDescription>
@@ -944,7 +944,7 @@ export default function Dashboard() {
 
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal flex items-center gap-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Newspaper className="h-4 w-4 text-purple-500" /> News & insights
             </CardTitle>
             <CardDescription className="text-[11px]">{role} focus</CardDescription>
@@ -1037,7 +1037,7 @@ export default function Dashboard() {
 
         <Card className="gap-0">
           <CardHeader className="py-2.5 px-4">
-            <CardTitle className="flex items-center gap-2 text-sm font-normal">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <Activity className="h-4 w-4" /> Safety score distribution
             </CardTitle>
             <CardDescription className="font-normal text-xs">
