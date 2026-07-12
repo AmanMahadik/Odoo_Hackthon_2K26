@@ -61,6 +61,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { useTheme } from 'next-themes';
 
 const LiveFleetMap = dynamic(() => import('@/components/maps/LiveFleetMap'), {
   ssr: false,
@@ -143,6 +144,11 @@ function bumpToTop<T extends { id: string }>(list: T[], id: string): T[] {
 
 export default function Dashboard() {
   const { role, canAccess } = useRole();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  // Theme-aware chart chrome (labels/grid must flip with light/dark)
+  const chartTick = isDark ? '#e2e8f0' : '#334155';
+  const chartGrid = isDark ? '#334155' : '#e2e8f0';
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -485,13 +491,13 @@ export default function Dashboard() {
   const excellentDrivers = mockDrivers.filter((d) => d.safety_score >= 90);
   // Explicit hex so bars stay visible in dark mode (CSS vars can wash out)
   const scoreDistribution = [
-    { name: '90-100 Excellent', count: excellentDrivers.length, fill: '#34d399' },
+    { name: '90–100 Excellent', count: excellentDrivers.length, fill: '#34d399' },
     {
-      name: '75-89 Average',
+      name: '75–89 Average',
       count: mockDrivers.length - highRiskDrivers.length - excellentDrivers.length,
-      fill: '#e5e5e5',
+      fill: '#fbbf24',
     },
-    { name: '<75 High Risk', count: highRiskDrivers.length, fill: '#f87171' },
+    { name: '<75 High risk', count: highRiskDrivers.length, fill: '#f87171' },
   ];
 
   const expiringLicenses = drivers.filter((d) => {
@@ -529,11 +535,11 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-2 animate-in fade-in duration-300">
+    <div className="space-y-5 animate-in fade-in duration-300">
       {/* Dashboard title + filters on one horizontal row */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <h1 className="text-lg tracking-tight text-foreground font-normal pl-0.5 sm:pl-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <h1 className="text-xl tracking-tight text-foreground font-medium">
             Dashboard
           </h1>
           {activeFilterCount > 0 && (
@@ -591,7 +597,7 @@ export default function Dashboard() {
       </div>
 
       {/* Map + right stack (fuel then live units) — heights aligned */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         <Card className="lg:col-span-8 overflow-hidden flex flex-col gap-0 py-0">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border shrink-0">
             <span className="text-sm font-normal flex items-center gap-2">
@@ -1023,40 +1029,46 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Analytics row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Analytics row — compact bottom, high-contrast bars */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 pb-0">
         {(role === 'Fleet Manager' || role === 'Maintenance Technician') && (
           <AIPredictionCard prediction={mockPrediction} vehicleReg="FLEET-T800" />
         )}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base font-normal">
-              <Activity className="h-5 w-5" /> Safety score distribution
+        <Card className="gap-0">
+          <CardHeader className="py-2.5 px-4">
+            <CardTitle className="flex items-center gap-2 text-sm font-normal">
+              <Activity className="h-4 w-4" /> Safety score distribution
             </CardTitle>
-            <CardDescription className="font-normal">Driver behavioral scores from telematics</CardDescription>
+            <CardDescription className="font-normal text-xs">
+              Driver behavioral scores from telematics
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
-              <ChartContainer config={{ count: { label: 'Drivers' } }} className="h-full w-full">
+          <CardContent className="px-4 pb-2.5 pt-0">
+            <div className="h-[160px] w-full">
+              <ChartContainer
+                config={{
+                  count: { label: 'Drivers', color: '#34d399' },
+                }}
+                className="h-full w-full aspect-auto"
+              >
                 <BarChart
                   data={scoreDistribution}
                   layout="vertical"
-                  margin={{ left: 10, right: 30, top: 10, bottom: 10 }}
+                  margin={{ left: 4, right: 12, top: 2, bottom: 0 }}
                 >
-                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={chartGrid} />
                   <XAxis type="number" hide />
                   <YAxis
                     dataKey="name"
                     type="category"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 400 }}
-                    className="text-foreground"
-                    width={120}
+                    tick={{ fill: chartTick, fontSize: 11, fontWeight: 400 }}
+                    width={118}
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={20}>
                     {scoreDistribution.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
@@ -1067,7 +1079,7 @@ export default function Dashboard() {
             {(role === 'Safety Officer' || role === 'Fleet Manager') && (
               <Link
                 href="/safety-command"
-                className={`mt-3 ${buttonVariants({ variant: 'outline', size: 'sm' })}`}
+                className={`${buttonVariants({ variant: 'outline', size: 'sm' })} mt-1.5 font-normal`}
               >
                 Open safety command
               </Link>
